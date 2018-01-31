@@ -2,26 +2,46 @@
   (:require [re-frame.core :as re-frame]
             [re-com.core :as re-com]
             [ewan.subs :as subs]
+            [ewan.events :as events]
             ))
 
-
 ;; home
-
-(defn home-title []
-  (let [name (re-frame/subscribe [::subs/name])]
-    [re-com/title
-     :label (str "Hello from " @name ". This is the Home Page.")
-     :level :level1]))
 
 (defn link-to-about-page []
   [re-com/hyperlink-href
    :label "go to About Page"
    :href "#/about"])
 
+(defn enter-todo []
+  (let [current-todo (re-frame/subscribe [::subs/current-todo])]
+    (fn []
+      [re-com/input-text
+       :model current-todo
+       :on-change #(re-frame/dispatch [::events/update-current-todo %])
+       :change-on-blur? false
+       :placeholder "Bold and brash"]
+      )))
+
+(defn todo-list []
+  (let [todos (re-frame/subscribe [::subs/todos])]
+    (fn []
+      [:ul
+       (for [todo @todos]
+         [:li {:key todo}
+          [:p todo]])])))
+
+(defn todo-form []
+  [:form {:on-submit (fn [e]
+                       (.preventDefault e)
+                       (re-frame/dispatch [::events/add-current-todo]))}
+   [enter-todo]])
+
 (defn home-panel []
   [re-com/v-box
    :gap "1em"
-   :children [[home-title] [link-to-about-page]]])
+   :children [[todo-list]
+              [todo-form]
+              [link-to-about-page]]])
 
 
 ;; about
