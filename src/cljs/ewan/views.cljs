@@ -3,6 +3,7 @@
             [re-com.core :as re-com]
             [ewan.subs :as subs]
             [ewan.events :as events]
+            [ewan.todos :as todos]
             ))
 
 ;; home
@@ -12,37 +13,12 @@
    :label "go to About Page"
    :href "#/about"])
 
-(defn enter-todo []
-  (let [current-todo (re-frame/subscribe [::subs/current-todo])]
-    (fn []
-      [re-com/input-text
-       :model current-todo
-       :on-change #(re-frame/dispatch [::events/update-current-todo %])
-       :change-on-blur? false
-       :placeholder "Bold and brash"]
-      )))
-
-(defn todo-list []
-  (let [todos (re-frame/subscribe [::subs/todos])]
-    (fn []
-      [:ul
-       (for [todo @todos]
-         [:li {:key todo}
-          [:p todo]])])))
-
-(defn todo-form []
-  [:form {:on-submit (fn [e]
-                       (.preventDefault e)
-                       (re-frame/dispatch [::events/add-current-todo]))}
-   [enter-todo]])
-
 (defn home-panel []
   [re-com/v-box
    :gap "1em"
-   :children [[todo-list]
-              [todo-form]
+   :children [[todos/todo-list]
+              [todos/todo-form]
               [link-to-about-page]]])
-
 
 ;; about
 

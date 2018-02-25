@@ -1,5 +1,7 @@
-(ns ewan.db)
+(ns ewan.db
+  (:require [re-frame.core :as re-frame]
+            [ewan.todos]))
 
 (def default-db
-  {:todos #{} 
-   :current-todo ""})
+  {:ewan.todos/todos #{} 
+   :ewan.todos/current-todo ""})
