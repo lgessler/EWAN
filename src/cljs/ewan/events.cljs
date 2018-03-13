@@ -1,7 +1,8 @@
 (ns ewan.events
   (:require [re-frame.core :as rf]
             [ewan.db :as db]
-            [cljsjs.pouchdb]))
+            [cljsjs.pouchdb]
+            [ewan.todos :as todos]))
 
 ;; ------------------------------------------------------------
 ;; pdb
@@ -31,16 +32,12 @@
 ;; db events
 ;; ------------------------------------------------------------
 
-;; TODO: when the docs are loaded, they have pdb's internal structure, but we assumed that
-;; the structure we'd need to deal with was the one under the "doc" key of pdb's internal
-;; structure. Need to either store everything together (complicating the app data structure)
-;; or store pdb's internal information elsewhere.
-
 ;; initialization
 (rf/reg-event-fx
  ::initialize-db
  (fn [{:keys [db]} _]
-   {:db db/default-db
+   {:db (merge db/default-db
+               todos/default-db)
     :pouchdb {:method "allDocs"
               :args [{:include_docs true}
                      (fn [error result]
@@ -51,8 +48,11 @@
 (rf/reg-event-db
  ::pdb-docs-loaded
  (fn [db [_ docs]]
-   (js/console.log (js->clj docs))
-   (update db :ewan.todos/todos into (js->clj docs))))
+   ;; ignore errors and row count, for now
+   (js/console.log docs)
+   (let [rows (get (js->clj docs) "rows")
+         docs (map #(get % "doc") rows)]
+     (update db :ewan.todos/todos into docs))))
 
 (rf/reg-event-fx
  ::save-pdb-docs
@@ -70,7 +70,17 @@
  ::pdb-docs-saved
  (fn [db [_ responses]]
    (js/console.log "Docs saved! responses:")
-   (js/console.log responses)))
+   (js/console.log responses)
+   ;; ignore errors for now
+
+   (assoc db
+          :ewan.todos/todos
+          (map (fn [row response]
+                 (-> row
+                     (assoc "_id" (get response "id"))
+                     (assoc "_rev" (get response "rev"))))
+               (:ewan.todos/todos db)
+               (js->clj responses)))))
 
 ;; navigation
 (rf/reg-event-db

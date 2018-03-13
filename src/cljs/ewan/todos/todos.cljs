@@ -3,6 +3,9 @@
             [re-com.core :as re-com]
             [ewan.events]))
 
+; :ewan.todos/todos #{} 
+; :ewan.todos/current-todo ""
+
 ;; subs
 
 (rf/reg-sub
@@ -26,7 +29,7 @@
  ::add-current-todo
  (fn [{:keys [db]} [_ new-text]]
    {:db (-> db
-          (update ::todos conj {:task (::current-todo db)})
+          (update ::todos conj {"task" (::current-todo db)})
           (assoc ::current-todo ""))
     :dispatch [:ewan.events/save-pdb-docs]}))
 
@@ -46,7 +49,7 @@
   (let [todos (rf/subscribe [::todos])]
     (fn []
       [:ul
-       (for [{:keys [task]} @todos]
+       (for [{:strs [task]} @todos]
          [:li {:key task}
           [:p task]])])))
 
@@ -58,4 +61,6 @@
               (rf/dispatch [::add-current-todo])))}
    [enter-todo]])
 
-
+(def ^:export default-db
+  {::todos #{}
+   ::current-todo ""})
