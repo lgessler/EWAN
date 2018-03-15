@@ -1,10 +1,6 @@
 (ns ewan.todos
   (:require [re-frame.core :as rf]
-            [re-com.core :as re-com]
-            [ewan.events]))
-
-; :ewan.todos/todos #{} 
-; :ewan.todos/current-todo ""
+            [re-com.core :as re-com]))
 
 ;; subs
 
