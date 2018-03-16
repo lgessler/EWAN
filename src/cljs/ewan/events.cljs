@@ -1,8 +1,8 @@
 (ns ewan.events
   (:require [re-frame.core :as rf]
             [ewan.db :as db]
-            [cljsjs.pouchdb]
-            [ewan.todos :as todos]))
+            [ewan.todos :as todos]
+            [cljsjs.pouchdb]))
 
 ;; ------------------------------------------------------------
 ;; pdb

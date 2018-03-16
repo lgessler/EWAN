@@ -21,8 +21,8 @@
 (defn home-panel []
   [re-com/v-box
    :gap "1em"
-   :children [[todos/todo-list]
-              [todos/todo-form]
+   :children [[todos/todo-form]
+              [todos/todo-list]
               [link-to-about-page]]])
 
 ;; about
@@ -60,17 +60,4 @@
      {:mui-theme (get-mui-theme
                   {:palette {:text-color (color :green600)}})}
      [:div
-      [ui/app-bar {:title "Title"
-                   :icon-element-right
-                   (r/as-element [ui/icon-button
-                                  (ic/action-account-balance-wallet)])}]
-      [ui/paper
-       [:div "Hello"]
-       [ui/mui-theme-provider
-        {:mui-theme (get-mui-theme {:palette {:text-color (color :blue200)}})}
-        [ui/raised-button {:label "Blue button"}]]
-       (ic/action-home {:color (color :grey600)})
-       [ui/raised-button {:label        "Click me"
-                          :icon         (ic/social-group)
-                          :on-click     #(println "clicked")}]]
       [panels @active-panel]]]))

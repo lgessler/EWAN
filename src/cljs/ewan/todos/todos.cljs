@@ -1,6 +1,11 @@
 (ns ewan.todos
   (:require [re-frame.core :as rf]
-            [re-com.core :as re-com]))
+            [re-com.core :as re-com]
+            [cljsjs.material-ui]
+            [cljs-react-material-ui.core]
+            [cljs-react-material-ui.reagent :as ui]
+            [cljs-react-material-ui.icons :as ic]
+            [reagent.core :as r]))
 
 ;; subs
 
@@ -55,6 +60,18 @@
             (.preventDefault e)
             (when (> (count @(rf/subscribe [::current-todo])) 0)
               (rf/dispatch [::add-current-todo])))}
+   [:div
+    [ui/app-bar {:title "Title"
+                 :icon-element-right
+                 (r/as-element [ui/icon-button
+                                (ic/action-account-balance-wallet)])}]
+    [ui/paper
+     [:div "Hello"]
+     [ui/raised-button {:label "Blue button"}]
+     (ic/action-home)
+     [ui/raised-button {:label        "Click me"
+                        :icon         (ic/social-group)
+                        :on-click     #(println "clicked")}]]]
    [enter-todo]])
 
 (def ^:export default-db

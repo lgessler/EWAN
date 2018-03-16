@@ -4,7 +4,9 @@
             [ewan.events :as events]
             [ewan.routes :as routes]
             [ewan.views :as views]
-            [ewan.config :as config]))
+            [ewan.config :as config]
+            ))
+
 
 
 (defn dev-setup []
