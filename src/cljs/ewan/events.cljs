@@ -50,8 +50,10 @@
  (fn [db [_ docs]]
    ;; ignore errors and row count, for now
    (js/console.log docs)
-   (let [rows (get (js->clj docs) "rows")
-         docs (map #(get % "doc") rows)]
+   (let [rows (:rows (js->clj docs :keywordize-keys true))
+         docs (map #(:doc %) rows)]
+     (js/console.log rows)
+     (js/console.log (doall docs))
      (update db :ewan.todos/todos into docs))))
 
 (rf/reg-event-fx
@@ -59,7 +61,7 @@
  (fn [{:keys [db]} _]
    {:db db
     :pouchdb {:method "bulkDocs"
-              :args [(:ewan.todos/todos db)
+              :args [(clj->js (:ewan.todos/todos db))
                      {}
                      (fn [error result]
                        (if error
@@ -77,8 +79,8 @@
           :ewan.todos/todos
           (map (fn [row response]
                  (-> row
-                     (assoc "_id" (get response "id"))
-                     (assoc "_rev" (get response "rev"))))
+                     (assoc :_id (get response "id"))
+                     (assoc :_rev (get response "rev"))))
                (:ewan.todos/todos db)
                (js->clj responses)))))
 
