@@ -36,7 +36,7 @@
   (if-not (xml/element? node)
     node
     (let [tag (snake->kebab (:tag node))
-          attrs (into {} (map (fn[[k v]] [(snake->kebab k) v])
+          attrs (into {} (map (fn [[k v]] [(snake->kebab k) v])
                               (:attrs node)))
           content (map xml->hiccup (:content node))]
       (into [tag attrs] content))))
@@ -49,11 +49,10 @@
   (if-not (vector? hiccup)
     hiccup
     (let [tag (kebab->snake (first hiccup))
-          attrs (into {} (map (fn[[k v]] [(kebab->snake k) v])
+          attrs (into {} (map (fn [[k v]] [(kebab->snake k) v])
                               (second hiccup)))
           content (map hiccup->xml (drop 2 hiccup))]
       (apply xml/element (into [tag attrs] content)))))
-
 
 
 ;; ----------------------------------------------------------------------------
@@ -66,22 +65,29 @@
 ;; A number will be given before each element which corresponds to the section
 ;; in the PDF guide that describes it.
 
-;; 2.1
+;; 2.1 annotation-document
 ;; --------------------------------------------
 (s/def ::annotation-document
   (s/cat :tag   #(= % :annotation-document)
-         :attrs (s/keys :req-un [::author ::date ::version]
-                        :opt-un [::format])))
+         :attrs (s/and
+                 (s/keys :req-un [::author ::date ::version]
+                         :opt-un [::format]))
+                 ;; "FORMAT - by convention the same as VERSION"
+                 #(if (:format %)
+                    (= (:format %) (:version %))
+                    true))))
 
 (s/def ::author string?)
 (s/def ::date #(some? (timefmt/parse %)))
 (s/def ::version string?)
 (s/def ::format string?)
 
+;; 2.2 annotation-document contents
+;; --------------------------------------------
 
 
 (def sample-xml (xml/parse-str
-"<ANNOTATION_DOCUMENT AUTHOR=\"jimbob\" DATE=\"2002-05-30T09:30:10.5\" VERSION=\"3.0\"></ANNOTATION_DOCUMENT>"))
+"<ANNOTATION_DOCUMENT AUTHOR=\"jimbob\" DATE=\"2002-05-30T09:30:10.5\" VERSION=\"3.0\" FORMAT=\"3.0\"></ANNOTATION_DOCUMENT>"))
 (def hiccup (xml->hiccup sample-xml))
 
 (= (hiccup->xml hiccup)
