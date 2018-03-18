@@ -1,15 +1,24 @@
 (defproject ewan "0.1.0-SNAPSHOT"
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.908"]
+                 [org.clojure/data.xml "0.2.0-alpha5"]
+
+                 ;; db
+                 [cljsjs/pouchdb "6.3.4-0"]
+
+                 ;; routing and state management
                  [secretary "1.2.3"]
                  [re-frame "0.10.2"]
+
+                 ;; ???
                  [com.andrewmcveigh/cljs-time "0.5.0"]
+
+                 ;; views
                  [re-com "2.1.0"]
                  [reagent "0.7.0"]
                  [cljsjs/react "15.6.1-1"]
                  [cljsjs/react-dom "15.6.1-1"]
-                 [cljs-react-material-ui "0.2.48"]
-                 [cljsjs/pouchdb "6.3.4-0"]]
+                 [cljs-react-material-ui "0.2.48"]]
 
   :plugins [[lein-cljsbuild "1.1.5"]
             [lein-less "1.7.5"]]
