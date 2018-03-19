@@ -2,15 +2,19 @@
   (:require [cljs.spec.alpha :as s]
             [clojure.data.xml :as xml]
             [cljs-time.format :as timefmt]
-            [cljs.pprint :refer [pprint]])
+            [cljs.pprint :refer [pprint]]
+            [clojure.string :as string])
   (:require-macros [cljs.spec.alpha :as s]))
-
 
 ;; ----------------------------------------------------------------------------
 ;; Conversion functions
 ;; ----------------------------------------------------------------------------
 ;; Internally, we will be using a Hiccup-like representation of EAF as it is
-;; losslessly serializable to JSON. Whenever we need to generate EAF for the user, we will use hiccup->xml, and whenever we need to ingest EAF, we will use xml->hiccup. Note that unlike normal Hiccup, non-terminal nodes in this representation MUST have a map present for attributes, even if it is empty, to align with the conventions of clojure.data.xml.
+;; losslessly serializable to JSON. Whenever we need to generate EAF for the
+;; user, we will use hiccup->xml, and whenever we need to ingest EAF, we will
+;; use xml->hiccup. Note that unlike normal Hiccup, non-terminal nodes in this
+;; representation MUST have a map present for attributes, even if it is empty,
+;; to align with the conventions of clojure.data.xml.
 
 (defn- snake->kebab
   [kwd]
@@ -67,31 +71,48 @@
 
 ;; 2.1 annotation-document
 ;; --------------------------------------------
-(s/def ::annotation-document
-  (s/cat :tag   #(= % :annotation-document)
-         :attrs (s/and
-                 (s/keys :req-un [::author ::date ::version]
-                         :opt-un [::format]))
-                 ;; "FORMAT - by convention the same as VERSION"
-                 #(if (:format %)
-                    (= (:format %) (:version %))
-                    true))))
-
 (s/def ::author string?)
 (s/def ::date #(some? (timefmt/parse %)))
 (s/def ::version string?)
 (s/def ::format string?)
 
-;; 2.2 annotation-document contents
+(s/def ::annotation-document
+  (s/cat
+   :tag   #(= % :annotation-document)
+   :attrs (s/and
+           (s/keys :req-un [::author ::date ::version]
+                   :opt-un [::format])
+           ;; if present, format must match version
+           #(if (:format %)
+              (= (:format %) (:version %))
+              true))
+   :license (s/spec (s/* ::license)))) ;; 2.2
+
+
+;; 2.2 license
+;; --------------------------------------------
+(s/def ::license (s/cat :tag #(= % :license)
+                        :attrs (s/keys :opt-un [::license-url])
+                        :contents string?))
+(s/def ::license-url string?)
+
+;; 2.3 header
 ;; --------------------------------------------
 
 
+
+
+
+
+
+
 (def sample-xml (xml/parse-str
-"<ANNOTATION_DOCUMENT AUTHOR=\"jimbob\" DATE=\"2002-05-30T09:30:10.5\" VERSION=\"3.0\" FORMAT=\"3.0\"></ANNOTATION_DOCUMENT>"))
+"<ANNOTATION_DOCUMENT AUTHOR=\"jimbob\" DATE=\"2002-05-30T09:30:10.5\" VERSION=\"3.0\" FORMAT=\"3.0\"><LICENSE>GPL</LICENSE></ANNOTATION_DOCUMENT>"))
 (def hiccup (xml->hiccup sample-xml))
 
 (= (hiccup->xml hiccup)
    sample-xml)
 
 (s/valid? ::annotation-document hiccup)
+(s/explain ::annotation-document hiccup)
 
