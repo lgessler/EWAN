@@ -71,11 +71,6 @@
 
 ;; 2.1 annotation-document
 ;; --------------------------------------------
-(s/def ::author string?)
-(s/def ::date #(some? (timefmt/parse %)))
-(s/def ::version string?)
-(s/def ::format string?)
-
 (s/def ::annotation-document
   (s/cat
    :tag   #(= % :annotation-document)
@@ -86,8 +81,14 @@
            #(if (:format %)
               (= (:format %) (:version %))
               true))
-   :license (s/spec (s/* ::license)))) ;; 2.2
+   :license (s/* (s/spec ::license)) ;; 2.2
+   :header (s/spec ::header) ;; 2.3
+   ))
 
+(s/def ::author string?)
+(s/def ::date #(some? (timefmt/parse %)))
+(s/def ::version string?)
+(s/def ::format string?)
 
 ;; 2.2 license
 ;; --------------------------------------------
@@ -98,21 +99,89 @@
 
 ;; 2.3 header
 ;; --------------------------------------------
+(s/def ::header
+  (s/cat :tag #(= % :header)
+         :attrs (s/keys :opt-un [::media-file ::time-units])
+         :media-descriptors (s/* (s/spec ::media-descriptor))
+         :linked-file-descriptors (s/* (s/spec ::linked-file-descriptor))
+         :properties (s/* (s/spec ::property))))
+
+(s/def ::media-file string?)
+(s/def ::time-units #{"milliseconds" "PAL-frames" "NTSC-frames"})
+
+;; 2.3.1 media descriptor
+(s/def ::media-descriptor
+  (s/cat :tag #(= % :media-descriptor)
+         :attrs (s/keys :req-un [::media-url
+                                 ::mime-type]
+                        :opt-un [::relative-media-url
+                                 ::time-origin
+                                 ::extracted-from])))
+
+(s/def ::media-url string?)
+(s/def ::mime-type string?)
+(s/def ::relative-media-url string?)
+(s/def ::time-origin number?)
+(s/def ::extracted-from string?)
+
+;; 2.3.2 linked file descriptor
+(s/def ::linked-file-descriptor
+  (s/cat :tag #(= % :linked-file-descriptor)
+         :attrs (s/keys :req-un [::link-url
+                                 ::mime-type]
+                        :opt-un [::relative-link-url
+                                 ::time-origin
+                                 ::associated-with])))
+
+;; mime-type and time-origin defined in 2.3.1
+(s/def ::link-url string?)
+(s/def ::relative-link-url string?)
+(s/def ::associated-with string?)
+
+;; 2.3.3 properties
+(s/def ::property
+  (s/cat :tag #(= % :property)
+         :attrs (s/keys :opt-un [::name])
+         :content string?))
+
+(s/def ::name string?)
 
 
 
+;--------------------------------------------------------------------------
+;--------------------------------------------------------------------------
 
 
+;(def sample-xml (xml/parse-str
+;"<ANNOTATION_DOCUMENT AUTHOR=\"jimbob\" DATE=\"2002-05-30T09:30:10.5\" VERSION=\"3.0\" FORMAT=\"3.0\"><LICENSE>GPL</LICENSE><HEADER><MEDIA_DESCRIPTOR MEDIA_URL=\"lgessler.com/test.mp4\" MIME_TYPE=\"application/video\"></MEDIA_DESCRIPTOR></HEADER></ANNOTATION_DOCUMENT>"))
+(def hiccup
+  [:annotation-document
+   {:author "jimbob"
+    :date "2002-05-30T09:30:10.5"
+    :version "3.0"
+    :format "3.0"}
+   [:license {} "GPL"]
+   [:license {} "MIT"]
+   [:header
+    {}
+    [:media-descriptor
+     {:media-url "lgessler.com/test.mp4"
+      :mime-type "video/mp4"}]
+    [:media-descriptor
+     {:media-url "lgessler.com/test2.png"
+      :mime-type "image/png"}]
+    [:linked-file-descriptor
+     {:link-url "lgessler.com/eye.track"
+      :mime-type "text/html"}]
+    [:property
+     {:name "foo"}
+     "bar"]]
+   ])
 
-
-
-(def sample-xml (xml/parse-str
-"<ANNOTATION_DOCUMENT AUTHOR=\"jimbob\" DATE=\"2002-05-30T09:30:10.5\" VERSION=\"3.0\" FORMAT=\"3.0\"><LICENSE>GPL</LICENSE></ANNOTATION_DOCUMENT>"))
-(def hiccup (xml->hiccup sample-xml))
-
-(= (hiccup->xml hiccup)
-   sample-xml)
+;(= (hiccup->xml hiccup)
+;   sample-xml)
 
 (s/valid? ::annotation-document hiccup)
 (s/explain ::annotation-document hiccup)
+(s/conform ::annotation-document hiccup)
 
