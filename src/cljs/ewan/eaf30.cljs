@@ -101,11 +101,11 @@
                                  ::time-origin
                                  ::extracted-from])))
 
+;; 2.3.2 linked file descriptor
 ;; mime-type and time-origin defined in 2.3.1
 (s/def ::link-url string?)
 (s/def ::relative-link-url string?)
 (s/def ::associated-with string?)
-;; 2.3.2 linked file descriptor
 (s/def ::linked-file-descriptor
   (s/cat :tag #(= % :linked-file-descriptor)
          :attrs (s/keys :req-un [::link-url
