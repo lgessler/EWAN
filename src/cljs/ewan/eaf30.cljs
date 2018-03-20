@@ -15,6 +15,11 @@
 ;; use xml->hiccup. Note that unlike normal Hiccup, non-terminal nodes in this
 ;; representation MUST have a map present for attributes, even if it is empty,
 ;; to align with the conventions of clojure.data.xml.
+;; NOTE 1: the XSD schema has many types that are more specific than what
+;;         we will specify here. E.g., URL's and numbers in the original XSD
+;;         schema are treated here as strings. Ideally we'd be more specific,
+;;         but it's not worth my time at the moment since it's unlikely these
+;;         would hold corrupt values anyway in most use-cases.
 
 (defn- snake->kebab
   [kwd]
@@ -68,6 +73,145 @@
 ;;    - http://www.mpi.nl/tools/elan/EAF_Annotation_Format_3.0_and_ELAN.pdf
 ;; A number will be given before each element which corresponds to the section
 ;; in the PDF guide that describes it.
+;;
+;; Note that we've had to give the definitions in a different order because of
+;; how spec expects all specs used in a dependent spec to be defined before
+;; reference.
+
+;; 2.2 license
+;; --------------------------------------------
+(s/def ::license-url string?)
+(s/def ::license (s/cat :tag #(= % :license)
+                        :attrs (s/keys :opt-un [::license-url])
+                        :contents string?))
+
+;; 2.3 header
+;; --------------------------------------------
+;; 2.3.1 media descriptor
+(s/def ::media-url string?)
+(s/def ::mime-type string?)
+(s/def ::relative-media-url string?)
+(s/def ::time-origin string?) ;; this should be a number, see Note 1 at top
+(s/def ::extracted-from string?)
+(s/def ::media-descriptor
+  (s/cat :tag #(= % :media-descriptor)
+         :attrs (s/keys :req-un [::media-url
+                                 ::mime-type]
+                        :opt-un [::relative-media-url
+                                 ::time-origin
+                                 ::extracted-from])))
+
+;; mime-type and time-origin defined in 2.3.1
+(s/def ::link-url string?)
+(s/def ::relative-link-url string?)
+(s/def ::associated-with string?)
+;; 2.3.2 linked file descriptor
+(s/def ::linked-file-descriptor
+  (s/cat :tag #(= % :linked-file-descriptor)
+         :attrs (s/keys :req-un [::link-url
+                                 ::mime-type]
+                        :opt-un [::relative-link-url
+                                 ::time-origin
+                                 ::associated-with])))
+
+;; 2.3.3 properties
+(s/def ::name string?)
+(s/def ::property
+  (s/cat :tag #(= % :property)
+         :attrs (s/keys :opt-un [::name])
+         :content string?))
+
+(s/def ::media-file string?)
+(s/def ::time-units #{"milliseconds" "PAL-frames" "NTSC-frames"})
+(s/def ::header
+  (s/cat :tag #(= % :header)
+         :attrs (s/keys :opt-un [::media-file ::time-units])
+         :media-descriptors (s/* (s/spec ::media-descriptor))
+         :linked-file-descriptors (s/* (s/spec ::linked-file-descriptor))
+         :properties (s/* (s/spec ::property))))
+
+
+;; 2.4 time order
+;; --------------------------------------------
+;; 2.4.1 time slots
+(s/def ::time-slot-id string?)
+;; this should actually ensure that TIME_VALUE holds a non-negative
+;; integer. See Note 1 at top
+(s/def ::time-value string?)
+(s/def ::time-slot
+  (s/cat :tag #(= % :time-slot)
+         :attrs (s/keys :req-un [::time-slot-id] :opt-un [::time-value])))
+
+(s/def ::time-order
+  (s/cat :tag #(= % :time-order)
+         :attrs map?
+         :time-slots (s/* (s/spec ::time-slot))))
+
+
+
+;; 2.5 tier
+;; --------------------------------------------
+;; 2.5.2 alignable annotation
+(s/def ::annotation-id string?) ;; next 4 from 2.5.5--also used in 2.5.3
+(s/def ::ext-ref string?)
+(s/def ::lang-ref string?)
+(s/def ::cve-ref string?)
+(s/def ::annotation-value string?) ;; from 2.5.4--also used in 2.5.3
+(s/def ::time-slot-ref1 string?)
+(s/def ::time-slot-ref2 string?)
+(s/def ::svg-ref string?)
+(s/def ::alignable-annotation
+  (s/cat :tag #(= % :alignable-annotation)
+         :attrs (s/keys :req-un [::annotation-id
+                                 ::time-slot-ref1
+                                 ::time-slot-ref2]
+                        :opt-un [::svg-ref
+                                 ::ext-ref
+                                 ::lang-ref
+                                 ::cve-ref])
+         :annotation-value ::annotation-value))
+
+;; 2.5.3 ref annotation
+(s/def ::annotation-ref string?)
+(s/def ::previous-annotation string?)
+(s/def ::ref-annotation
+  (s/cat :tag #(= % :ref-annotation)
+         :attrs (s/keys :req-un [::annotation-id
+                                 ::annotation-ref]
+                        :opt-un [::previous-annotation
+                                 ::ext-ref
+                                 ::lang-ref
+                                 ::cve-ref])
+         :annotation-value ::annotation-value))
+
+;; 2.5.1 annotation
+(s/def ::annotation
+  (s/cat :tag #(= % :annotation)
+         :attrs map?
+         :child (s/alt :alignable-annotation
+                       (s/spec ::alignable-annotation)
+                       :ref-annotation
+                       (s/spec ::ref-annotation))))
+
+(s/def ::tier-id string?)
+(s/def ::participant string?)
+(s/def ::annotator string?)
+(s/def ::linguistic-type-ref string?)
+(s/def ::default-locale string?)
+(s/def ::parent-ref string?)
+(s/def ::ext-ref string?)
+(s/def ::lang-ref string?)
+(s/def ::tier
+  (s/cat :tag #(= % :tier)
+         :attrs (s/keys :req-un [::tier-id
+                                 ::linguistic-type-ref]
+                        :opt-un [::participant
+                                 ::annotator
+                                 ::default-locale
+                                 ::parent-ref
+                                 ::ext-ref
+                                 ::lang-ref])
+         :annotations (s/* (s/spec ::annotation))))
 
 ;; 2.1 annotation-document
 ;; --------------------------------------------
@@ -83,6 +227,8 @@
               true))
    :license (s/* (s/spec ::license)) ;; 2.2
    :header (s/spec ::header) ;; 2.3
+   :time-order (s/spec ::time-order) ;; 2.4
+   :tiers (s/* (s/spec ::tier)) ;; 2.5
    ))
 
 (s/def ::author string?)
@@ -90,73 +236,15 @@
 (s/def ::version string?)
 (s/def ::format string?)
 
-;; 2.2 license
-;; --------------------------------------------
-(s/def ::license (s/cat :tag #(= % :license)
-                        :attrs (s/keys :opt-un [::license-url])
-                        :contents string?))
-(s/def ::license-url string?)
-
-;; 2.3 header
-;; --------------------------------------------
-(s/def ::header
-  (s/cat :tag #(= % :header)
-         :attrs (s/keys :opt-un [::media-file ::time-units])
-         :media-descriptors (s/* (s/spec ::media-descriptor))
-         :linked-file-descriptors (s/* (s/spec ::linked-file-descriptor))
-         :properties (s/* (s/spec ::property))))
-
-(s/def ::media-file string?)
-(s/def ::time-units #{"milliseconds" "PAL-frames" "NTSC-frames"})
-
-;; 2.3.1 media descriptor
-(s/def ::media-descriptor
-  (s/cat :tag #(= % :media-descriptor)
-         :attrs (s/keys :req-un [::media-url
-                                 ::mime-type]
-                        :opt-un [::relative-media-url
-                                 ::time-origin
-                                 ::extracted-from])))
-
-(s/def ::media-url string?)
-(s/def ::mime-type string?)
-(s/def ::relative-media-url string?)
-(s/def ::time-origin number?)
-(s/def ::extracted-from string?)
-
-;; 2.3.2 linked file descriptor
-(s/def ::linked-file-descriptor
-  (s/cat :tag #(= % :linked-file-descriptor)
-         :attrs (s/keys :req-un [::link-url
-                                 ::mime-type]
-                        :opt-un [::relative-link-url
-                                 ::time-origin
-                                 ::associated-with])))
-
-;; mime-type and time-origin defined in 2.3.1
-(s/def ::link-url string?)
-(s/def ::relative-link-url string?)
-(s/def ::associated-with string?)
-
-;; 2.3.3 properties
-(s/def ::property
-  (s/cat :tag #(= % :property)
-         :attrs (s/keys :opt-un [::name])
-         :content string?))
-
-(s/def ::name string?)
-
-
 
 ;--------------------------------------------------------------------------
 ;--------------------------------------------------------------------------
 
 
-;(def sample-xml (xml/parse-str
-;"<ANNOTATION_DOCUMENT AUTHOR=\"jimbob\" DATE=\"2002-05-30T09:30:10.5\" VERSION=\"3.0\" FORMAT=\"3.0\"><LICENSE>GPL</LICENSE><HEADER><MEDIA_DESCRIPTOR MEDIA_URL=\"lgessler.com/test.mp4\" MIME_TYPE=\"application/video\"></MEDIA_DESCRIPTOR></HEADER></ANNOTATION_DOCUMENT>"))
+
 (def hiccup
   [:annotation-document
-   {:author "jimbob"
+   {:author "james"
     :date "2002-05-30T09:30:10.5"
     :version "3.0"
     :format "3.0"}
@@ -176,12 +264,31 @@
     [:property
      {:name "foo"}
      "bar"]]
+   [:time-order
+    {}
+    [:time-slot {:time-slot-id "123" :time-value "12113"}]]
+   [:tier
+    {:tier-id "tier1"
+     :linguistic-type-ref "default-lt"}
+    [:annotation
+     {}
+     [:alignable-annotation
+      {:annotation-id "Helloworld"
+       :time-slot-ref1 "t1"
+       :time-slot-ref2 "t2"}
+      "O missong my tomatoes"]]
+    ]
    ])
 
+
+;(def sample-xml (xml/parse-str
+;                 "<ANNOTATION_DOCUMENT AUTHOR=\"jimbob\" DATE=\"2002-05-30T09:30:10.5\" VERSION=\"3.0\" FORMAT=\"3.0\"><LICENSE>GPL</LICENSE><HEADER><MEDIA_DESCRIPTOR MEDIA_URL=\"lgessler.com/test.mp4\" MIME_TYPE=\"application/video\"></MEDIA_DESCRIPTOR></HEADER><TIME_ORDER><TIME_SLOT TIME_SLOT_ID=\"ts1\" TIME_VALUE=\"300\"/></TIME_ORDER></ANNOTATION_DOCUMENT>"))
+
+;(def hiccup (xml->hiccup sample-xml))
 ;(= (hiccup->xml hiccup)
 ;   sample-xml)
 
 (s/valid? ::annotation-document hiccup)
 (s/explain ::annotation-document hiccup)
-(s/conform ::annotation-document hiccup)
+;(s/conform ::annotation-document hiccup)
 
