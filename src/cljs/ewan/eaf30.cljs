@@ -213,8 +213,43 @@
                                  ::lang-ref])
          :annotations (s/* (s/spec ::annotation))))
 
-;; 2.1 annotation-document
+;; 2.6 linguistic type
 ;; --------------------------------------------
+(s/def ::linguistic-type-id string?)
+(s/def ::time-alignable #{"true" "false"})
+(s/def ::constraints string?)
+(s/def ::graphic-references #{"true" "false"})
+(s/def ::controlled-vocabulary-ref string?)
+(s/def ::lexicon-ref string?)
+(s/def ::linguistic-type
+  (s/cat :tag #(= % :linguistic-type)
+         :attrs (s/keys :req-un [::linguistic-type-id]
+                        :opt-un [::time-alignable
+                                 ::constraints
+                                 ::graphic-references
+                                 ::controlled-vocabulary-ref
+                                 ::ext-ref
+                                 ::lexicon-ref])))
+;; ext-ref is defined above in 2.5.1. There is a slight semantic difference
+;; here since 2.5.1's ext ref allows multiple refs, but since we're only
+;; checking if it's a string in this spec, it doesn't matter.
+
+;; 2.7 constraint
+;; --------------------------------------------
+(s/def ::stereotype #{"Time_Subdivision" "Symbolic_Subdivision"
+                      "Symbolic_Association" "Included_In"})
+(s/def ::description string?)
+(s/def ::constraint
+  (s/cat :tag #(= % :constraint)
+         :attrs (s/keys :req-un [::stereotype]
+                        :opt-un [::description])))
+
+;; 2.1 annotation document
+;; --------------------------------------------
+(s/def ::author string?)
+(s/def ::date #(some? (timefmt/parse %)))
+(s/def ::version string?)
+(s/def ::format string?)
 (s/def ::annotation-document
   (s/cat
    :tag   #(= % :annotation-document)
@@ -229,13 +264,8 @@
    :header (s/spec ::header) ;; 2.3
    :time-order (s/spec ::time-order) ;; 2.4
    :tiers (s/* (s/spec ::tier)) ;; 2.5
+   :linguistic-type (s/* (s/spec ::linguistic-type)) ;; 2.6
    ))
-
-(s/def ::author string?)
-(s/def ::date #(some? (timefmt/parse %)))
-(s/def ::version string?)
-(s/def ::format string?)
-
 
 ;--------------------------------------------------------------------------
 ;--------------------------------------------------------------------------
@@ -276,8 +306,8 @@
       {:annotation-id "Helloworld"
        :time-slot-ref1 "t1"
        :time-slot-ref2 "t2"}
-      "O missong my tomatoes"]]
-    ]
+      "O missong my tomatoes"]]]
+   [:linguistic-type {:linguistic-type-id "type1"}]
    ])
 
 
