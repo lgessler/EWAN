@@ -5,8 +5,13 @@ This is an experimental port of [ELAN](https://tla.mpi.nl/tools/tla-tools/elan/)
 # Roadmap
 
 ☐ Translate [EAF XSD](www.mpi.nl/tools/elan/EAFv3.0.xsd) into a Clojure [spec](https://clojure.org/guides/spec)
+
 ☐ Implement most basic ELAN workflows
+
 ☐ Allow export and import of EAF
+
 ☐ Full ELAN functionality coverage
+
 ☐ Support remote syncing of projects (this also entails accounts and auth)
+
 ☐ Support live collaborative editing *à la* Google Docs
