@@ -280,6 +280,110 @@
 
 ;; 2.10 external ref
 ;; --------------------------------------------
+(s/def ::ext-ref-id string?)
+(s/def ::type #{"iso12620" "ecv" "cve_id" "lexen_id" "resource_url"})
+(s/def ::value string?)
+(s/def ::external-ref
+  (s/cat :tag #(= % :external-ref)
+         :attrs (s/keys ::req-un [::ext-ref-id
+                                  ::type
+                                  ::value])))
+
+;; 2.11 locale
+;; --------------------------------------------
+(s/def ::language-code string?)
+(s/def ::country-code string?)
+(s/def ::variant string?)
+(s/def ::locale
+  (s/cat :tag #(= % :locale)
+         :attrs (s/keys ::req-un [::language-code]
+                        ::opt-un [::country-code
+                                  ::variant])))
+
+;; 2.12 language
+;; --------------------------------------------
+(s/def ::lang-id string?)
+(s/def ::lang-def string?)
+(s/def ::lang-label string?)
+(s/def ::language
+  (s/cat :tag #(= % :language)
+         :attrs (s/keys ::req-un [::lang-id]
+                        ::opt-un [::lang-def
+                                  ::lang-label])))
+
+;; 2.13 lexicon ref
+;; --------------------------------------------
+;; some of these have previous collisions, so just namespace them all
+(s/def :ewan.eaf30.lexicon-ref/lex-ref-id string?)
+(s/def :ewan.eaf30.lexicon-ref/name string?)
+(s/def :ewan.eaf30.lexicon-ref/type string?)
+(s/def :ewan.eaf30.lexicon-ref/url string?)
+(s/def :ewan.eaf30.lexicon-ref/lexicon-id string?)
+(s/def :ewan.eaf30.lexicon-ref/lexicon-name string?)
+(s/def :ewan.eaf30.lexicon-ref/datcat-id string?)
+(s/def :ewan.eaf30.lexicon-ref/datcat-name string?)
+(s/def ::lexicon-ref
+  (s/cat :tag #(= % :lexicon-ref)
+         :attrs (s/keys ::req-un [:ewan.eaf30.lexicon-ref/lex-ref-id
+                                  :ewan.eaf30.lexicon-ref/name
+                                  :ewan.eaf30.lexicon-ref/type
+                                  :ewan.eaf30.lexicon-ref/url
+                                  :ewan.eaf30.lexicon-ref/lexicon-id
+                                  :ewan.eaf30.lexicon-ref/lexicon-name]
+                        ::opt-un [:ewan.eaf30.lexicon-ref/datcat-id
+                                  :ewan.eaf30.lexicon-ref/datcat-name])))
+
+;; 2.14 ref link set
+;; --------------------------------------------
+;; 2.14.3 refLinkAttribute
+(s/def ::ref-link-id string?)
+(s/def ::ref-link-name string?)
+;; ext-ref, lang-ref, cve-ref already defined in 2.5
+(s/def ::ref-type string?)
+
+;; 2.14.1 cross ref link
+(s/def ::ref1 string?)
+(s/def ::ref2 string?)
+(s/def ::directionality #{"undirected" "unidirectional" "bidirectional"})
+(s/def ::cross-ref-link
+  (s/cat :tag #(= % :cross-ref-link)
+         :attrs (s/keys ::req-un [::ref1
+                                  ::ref2
+                                  ::ref-link-id]
+                        ::opt-un [::directionality
+                                  ::ref-link-name
+                                  ::ext-ref
+                                  ::lang-ref
+                                  ::cve-ref
+                                  ::ref-type])))
+
+;; 2.14.2 group ref link
+(s/def ::refs string?)
+(s/def ::group-ref-link
+  (s/cat :tag #(= % :group-ref-link)
+         :attrs (s/keys ::req-un [::refs
+                                  ::ref-link-id]
+                        ::opt-un [::ref-link-name
+                                  ::ext-ref
+                                  ::lang-ref
+                                  ::cve-ref
+                                  ::ref-type])))
+
+(s/def ::link-set-id string?)
+(s/def ::link-set-name string?)
+(s/def ::cv-ref string?)
+(s/def ::ref-link-set
+  (s/cat :tag #(= % :ref-link-set)
+         :attrs (s/keys ::req-un [::link-set-id]
+                        ::opt-un [::link-set-name
+                                  ::ext-ref       ;; from 2.5
+                                  ::lang-ref      ;; from 2.5
+                                  ::cv-ref])
+         :links (s/* (s/alt :cross-ref-link
+                            (s/spec ::cross-ref-link)
+                            :group-ref-link
+                            (s/spec ::group-ref-link)))))
+
 
 ;; 2.1 annotation document
 ;; --------------------------------------------
@@ -304,6 +408,11 @@
    :linguistic-type (s/* (s/spec ::linguistic-type)) ;; 2.6
    :constraints (s/* (s/spec ::constraint)) ;; 2.7
    :controlled-vocabulary (s/* (s/spec ::controlled-vocabulary)) ;; 2.9
+   :external-ref (s/* (s/spec ::external-ref)) ;; 2.10
+   :locale (s/* (s/spec ::locale)) ;; 2.11
+   :language (s/* (s/spec ::language)) ;; 2.12
+   :lexicon-ref (s/* (s/spec ::lexicon-ref)) ;; 2.13
+   :ref-link-set (s/* (s/spec ::ref-link-set)) ;; 2.14
    ))
 
 ;--------------------------------------------------------------------------
