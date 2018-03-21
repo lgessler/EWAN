@@ -200,7 +200,6 @@
 (s/def ::default-locale string?)
 (s/def ::parent-ref string?)
 (s/def ::ext-ref string?)
-(s/def ::lang-ref string?)
 (s/def ::tier
   (s/cat :tag #(= % :tier)
          :attrs (s/keys :req-un [::tier-id
@@ -210,7 +209,7 @@
                                  ::default-locale
                                  ::parent-ref
                                  ::ext-ref
-                                 ::lang-ref])
+                                 ::lang-ref]) ;; already defined in 2.5.2
          :annotations (s/* (s/spec ::annotation))))
 
 ;; 2.6 linguistic type
@@ -244,6 +243,44 @@
          :attrs (s/keys :req-un [::stereotype]
                         :opt-un [::description])))
 
+
+;; 2.9 controlled vocabulary
+;; --------------------------------------------
+
+;; 2.9.2 cve value
+(s/def ::cve-value
+  (s/cat :tag #(= % :cve-value)
+         :attrs (s/keys :req-un [::lang-ref] ;; already defined in 2.5.2
+                        :opt-un [::description]) ;; 2.7
+         :contents string?))
+
+;; 2.9.1 cv entry ml
+(s/def ::cve-id string?)
+(s/def ::cv-entry-ml
+  (s/cat :tag #(= % :cv-entry-ml)
+         :attrs (s/keys :req-un [::cve-id]
+                        :opt-un [::ext-ref]) ;; defined in 2.5.1
+         :values (s/+ (s/spec ::cve-value))))
+
+;; 2.9.3 description
+;; tag is actually called DESCRIPTION, but there is a collision with 2.7
+(s/def ::cv-description
+  (s/cat :tag #(= % :description)
+         :attrs (s/keys :req-un [::lang-ref]) ;; already defined in 2.5.2
+         :contents string?))
+
+(s/def ::cv-id string?)
+(s/def ::controlled-vocabulary
+  (s/cat :tag  #(= % :controlled-vocabulary)
+         :attrs (s/keys :req-un [::cv-id]
+                        :opt-un [::ext-ref]) ;; defined in 2.5.1
+         :descriptions (s/* (s/spec ::cv-description))
+         :cv-entry-ml (s/* (s/spec ::cv-entry-ml))
+         ))
+
+;; 2.10 external ref
+;; --------------------------------------------
+
 ;; 2.1 annotation document
 ;; --------------------------------------------
 (s/def ::author string?)
@@ -265,6 +302,8 @@
    :time-order (s/spec ::time-order) ;; 2.4
    :tiers (s/* (s/spec ::tier)) ;; 2.5
    :linguistic-type (s/* (s/spec ::linguistic-type)) ;; 2.6
+   :constraints (s/* (s/spec ::constraint)) ;; 2.7
+   :controlled-vocabulary (s/* (s/spec ::controlled-vocabulary)) ;; 2.9
    ))
 
 ;--------------------------------------------------------------------------
@@ -278,7 +317,7 @@
     :date "2002-05-30T09:30:10.5"
     :version "3.0"
     :format "3.0"}
-   [:license {} "GPL"]
+    [:license {} "GPL"]
    [:license {} "MIT"]
    [:header
     {}
@@ -308,8 +347,25 @@
        :time-slot-ref2 "t2"}
       "O missong my tomatoes"]]]
    [:linguistic-type {:linguistic-type-id "type1"}]
+   [:controlled-vocabulary
+    {:cv-id "BegripnaamCV"}
+    [:description {:lang-ref "nld"} "Een lijst van begrip namen"]
+    [:description {:lang-ref "eng"} "A list of concept names"]
+    [:cv-entry-ml
+     {:cve-id "cveid0"}
+     [:cve-value
+      {:description "Overeenkomst tot levering van een periodieke uitgave"
+       :lang-ref "nld"}
+      "ABONNEMENT"]
+     [:cve-value
+      {:description "Agreement of periodic delivery of a product"
+       :lang-ref "eng"}
+      "SUBSCRIPTION-en"]]]
    ])
 
+(s/valid? ::annotation-document hiccup)
+(s/explain ::annotation-document hiccup)
+(s/conform ::annotation-document hiccup)
 
 ;(def sample-xml (xml/parse-str
 ;                 "<ANNOTATION_DOCUMENT AUTHOR=\"jimbob\" DATE=\"2002-05-30T09:30:10.5\" VERSION=\"3.0\" FORMAT=\"3.0\"><LICENSE>GPL</LICENSE><HEADER><MEDIA_DESCRIPTOR MEDIA_URL=\"lgessler.com/test.mp4\" MIME_TYPE=\"application/video\"></MEDIA_DESCRIPTOR></HEADER><TIME_ORDER><TIME_SLOT TIME_SLOT_ID=\"ts1\" TIME_VALUE=\"300\"/></TIME_ORDER></ANNOTATION_DOCUMENT>"))
@@ -318,7 +374,4 @@
 ;(= (hiccup->xml hiccup)
 ;   sample-xml)
 
-(s/valid? ::annotation-document hiccup)
-(s/explain ::annotation-document hiccup)
-;(s/conform ::annotation-document hiccup)
 
