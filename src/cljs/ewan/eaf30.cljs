@@ -156,10 +156,16 @@
 (s/def ::ext-ref string?)
 (s/def ::lang-ref string?)
 (s/def ::cve-ref string?)
-(s/def ::annotation-value string?) ;; from 2.5.4--also used in 2.5.3
 (s/def ::time-slot-ref1 string?)
 (s/def ::time-slot-ref2 string?)
 (s/def ::svg-ref string?)
+
+;; from 2.5.4--also used in 2.5.3
+(s/def ::annotation-value
+  (s/cat :tag #(= % :annotation-value)
+         :attrs map?
+         :contents string?))
+
 (s/def ::alignable-annotation
   (s/cat :tag #(= % :alignable-annotation)
          :attrs (s/keys :req-un [::annotation-id
@@ -169,7 +175,7 @@
                                  ::ext-ref
                                  ::lang-ref
                                  ::cve-ref])
-         :annotation-value ::annotation-value))
+         :annotation-value (s/spec ::annotation-value)))
 
 ;; 2.5.3 ref annotation
 (s/def ::annotation-ref string?)
@@ -182,7 +188,7 @@
                                  ::ext-ref
                                  ::lang-ref
                                  ::cve-ref])
-         :annotation-value ::annotation-value))
+         :annotation-value (s/spec ::annotation-value)))
 
 ;; 2.5.1 annotation
 (s/def ::annotation
@@ -415,72 +421,24 @@
    :ref-link-set (s/* (s/spec ::ref-link-set)) ;; 2.14
    ))
 
-;--------------------------------------------------------------------------
-;--------------------------------------------------------------------------
+;; ----------------------------------------------------------------------------
+;; API
+;; ----------------------------------------------------------------------------
+;; NOTE: this is NOT a correct solution. While this does get rid of whitespace
+;; between tags, it also gets rid of the content of any inner content that
+;; might match /\s+/, such as `<p>     </p>`. Hopefully this won't be a huge
+;; problem for EAF.
+(defn- remove-whitespace
+  [str]
+  (clojure.string/replace str #">\s+<" "><"))
 
+(defn parse-eaf-str
+  [str]
+  (-> str
+      remove-whitespace
+      xml/parse-str
+      xml->hiccup))
 
-
-(def hiccup
-  [:annotation-document
-   {:author "james"
-    :date "2002-05-30T09:30:10.5"
-    :version "3.0"
-    :format "3.0"}
-    [:license {} "GPL"]
-   [:license {} "MIT"]
-   [:header
-    {}
-    [:media-descriptor
-     {:media-url "lgessler.com/test.mp4"
-      :mime-type "video/mp4"}]
-    [:media-descriptor
-     {:media-url "lgessler.com/test2.png"
-      :mime-type "image/png"}]
-    [:linked-file-descriptor
-     {:link-url "lgessler.com/eye.track"
-      :mime-type "text/html"}]
-    [:property
-     {:name "foo"}
-     "bar"]]
-   [:time-order
-    {}
-    [:time-slot {:time-slot-id "123" :time-value "12113"}]]
-   [:tier
-    {:tier-id "tier1"
-     :linguistic-type-ref "default-lt"}
-    [:annotation
-     {}
-     [:alignable-annotation
-      {:annotation-id "Helloworld"
-       :time-slot-ref1 "t1"
-       :time-slot-ref2 "t2"}
-      "O missong my tomatoes"]]]
-   [:linguistic-type {:linguistic-type-id "type1"}]
-   [:controlled-vocabulary
-    {:cv-id "BegripnaamCV"}
-    [:description {:lang-ref "nld"} "Een lijst van begrip namen"]
-    [:description {:lang-ref "eng"} "A list of concept names"]
-    [:cv-entry-ml
-     {:cve-id "cveid0"}
-     [:cve-value
-      {:description "Overeenkomst tot levering van een periodieke uitgave"
-       :lang-ref "nld"}
-      "ABONNEMENT"]
-     [:cve-value
-      {:description "Agreement of periodic delivery of a product"
-       :lang-ref "eng"}
-      "SUBSCRIPTION-en"]]]
-   ])
-
-(s/valid? ::annotation-document hiccup)
-(s/explain ::annotation-document hiccup)
-(s/conform ::annotation-document hiccup)
-
-;(def sample-xml (xml/parse-str
-;                 "<ANNOTATION_DOCUMENT AUTHOR=\"jimbob\" DATE=\"2002-05-30T09:30:10.5\" VERSION=\"3.0\" FORMAT=\"3.0\"><LICENSE>GPL</LICENSE><HEADER><MEDIA_DESCRIPTOR MEDIA_URL=\"lgessler.com/test.mp4\" MIME_TYPE=\"application/video\"></MEDIA_DESCRIPTOR></HEADER><TIME_ORDER><TIME_SLOT TIME_SLOT_ID=\"ts1\" TIME_VALUE=\"300\"/></TIME_ORDER></ANNOTATION_DOCUMENT>"))
-
-;(def hiccup (xml->hiccup sample-xml))
-;(= (hiccup->xml hiccup)
-;   sample-xml)
-
-
+(defn eaf?
+  [hiccup]
+  (s/valid? ::annotation-document hiccup))
