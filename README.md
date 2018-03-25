@@ -4,7 +4,7 @@ This is an experimental port of [ELAN](https://tla.mpi.nl/tools/tla-tools/elan/)
 
 # Roadmap
 
-☐ Translate [EAF XSD](www.mpi.nl/tools/elan/EAFv3.0.xsd) into a Clojure [spec](https://clojure.org/guides/spec)
+☐ Translate [EAF XSD](http://www.mpi.nl/tools/elan/EAFv3.0.xsd) into a Clojure [spec](https://clojure.org/guides/spec)
 
 ☐ Implement most basic ELAN workflows
 
