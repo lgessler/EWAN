@@ -397,6 +397,8 @@
 (s/def ::date #(some? (timefmt/parse %)))
 (s/def ::version string?)
 (s/def ::format string?)
+;; Note that the order of the seq in the XSD is NOT the same as that of
+;; the section numbers in the explanatory document
 (s/def ::annotation-document
   (s/cat
    :tag   #(= % :annotation-document)
@@ -412,13 +414,13 @@
    :time-order (s/spec ::time-order) ;; 2.4
    :tiers (s/* (s/spec ::tier)) ;; 2.5
    :linguistic-type (s/* (s/spec ::linguistic-type)) ;; 2.6
-   :constraints (s/* (s/spec ::constraint)) ;; 2.7
-   :controlled-vocabulary (s/* (s/spec ::controlled-vocabulary)) ;; 2.9
-   :external-ref (s/* (s/spec ::external-ref)) ;; 2.10
    :locale (s/* (s/spec ::locale)) ;; 2.11
    :language (s/* (s/spec ::language)) ;; 2.12
+   :constraints (s/* (s/spec ::constraint)) ;; 2.7
+   :controlled-vocabulary (s/* (s/spec ::controlled-vocabulary)) ;; 2.9
    :lexicon-ref (s/* (s/spec ::lexicon-ref)) ;; 2.13
    :ref-link-set (s/* (s/spec ::ref-link-set)) ;; 2.14
+   :external-ref (s/* (s/spec ::external-ref)) ;; 2.10
    ))
 
 ;; ----------------------------------------------------------------------------
