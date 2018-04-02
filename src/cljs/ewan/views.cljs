@@ -55,7 +55,10 @@
   (let [active-panel (re-frame/subscribe [::subs/active-panel])]
     [ui/mui-theme-provider
      {:mui-theme (get-mui-theme
-                  {:palette {:text-color (color :green600)}})}
+                  (.-LightRawTheme js/MaterialUIStyles))}
+      ;(get-mui-theme
+      ;            {:palette {:text-color (color :green600)}
+      ;             :app-bar {:height 44}})}
      [:div
       [ui/app-bar {:title "Title"
                    :icon-element-right
