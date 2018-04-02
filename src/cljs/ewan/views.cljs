@@ -3,7 +3,6 @@
             [re-com.core :as re-com]
             [ewan.subs :as subs]
             [ewan.events :as events]
-            [ewan.todos :as todos]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core :refer [get-mui-theme color]]
             [cljs-react-material-ui.reagent :as ui]
@@ -21,9 +20,7 @@
 (defn home-panel []
   [re-com/v-box
    :gap "1em"
-   :children [[todos/todo-form]
-              [todos/todo-list]
-              [link-to-about-page]]])
+   :children [[link-to-about-page]]])
 
 ;; about
 
@@ -40,8 +37,8 @@
 (defn about-panel []
   [re-com/v-box
    :gap "1em"
-   :children [[about-title] [link-to-home-page]]])
-
+   :children [[about-title]
+              [link-to-home-page]]])
 
 ;; main
 
@@ -60,4 +57,8 @@
      {:mui-theme (get-mui-theme
                   {:palette {:text-color (color :green600)}})}
      [:div
+      [ui/app-bar {:title "Title"
+                   :icon-element-right
+                   (r/as-element [ui/icon-button
+                                  (ic/action-account-balance-wallet)])}]
       [panels @active-panel]]]))
