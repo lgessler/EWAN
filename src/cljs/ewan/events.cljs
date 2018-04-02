@@ -8,8 +8,9 @@
 ;; pdb
 ;; ------------------------------------------------------------
 
-(def pdb-todos (js/PouchDB. "todos"))
-;; allDocs, bulkDocs([docs])
+;; TODO: allow the selection of a database. For now, just use
+;; a single DB
+(def current-db (js/PouchDB. "default-db"))
 
 ;; ------------------------------------------------------------
 ;; pdb effects
@@ -19,10 +20,11 @@
   [{:as request
     :keys [method args]}]
   (if-not (#{"allDocs" "bulkDocs"} method)
-    (throw (js/Error. (str "Unsupported PouchDB method: " method))))
+    (throw
+     (js/Error. (str "Unsupported PouchDB method: " method))))
 
-
-  (let [combined-args (clj->js (into [pdb-todos method] args))]
+  (let [combined-args (clj->js
+                       (into [current-db method] args))]
     (js/console.log "Attempting to invoke:" combined-args)
     (apply js-invoke combined-args)))
 
@@ -36,14 +38,16 @@
 (rf/reg-event-fx
  ::initialize-db
  (fn [{:keys [db]} _]
-   {:db (merge db/default-db
-               todos/default-db)
-    :pouchdb {:method "allDocs"
-              :args [{:include_docs true}
-                     (fn [error result]
-                       (if error
-                         (throw error)
-                         (rf/dispatch [::pdb-docs-loaded result])))]}}))
+   {:db
+    (merge db/default-db
+           todos/default-db)
+    :pouchdb
+    {:method "allDocs"
+     :args [{:include_docs true}
+            (fn [error result]
+              (if error
+                (throw error)
+                (rf/dispatch [::pdb-docs-loaded result])))]}}))
 
 (rf/reg-event-db
  ::pdb-docs-loaded
@@ -60,13 +64,14 @@
  ::save-pdb-docs
  (fn [{:keys [db]} _]
    {:db db
-    :pouchdb {:method "bulkDocs"
-              :args [(clj->js (:ewan.todos/todos db))
-                     {}
-                     (fn [error result]
-                       (if error
-                         (throw error)
-                         (rf/dispatch [::pdb-docs-saved result])))]}}))
+    :pouchdb
+    {:method "bulkDocs"
+     :args [(clj->js (:ewan.todos/todos db))
+            {}
+            (fn [error result]
+              (if error
+                (throw error)
+                (rf/dispatch [::pdb-docs-saved result])))]}}))
 
 (rf/reg-event-db
  ::pdb-docs-saved
