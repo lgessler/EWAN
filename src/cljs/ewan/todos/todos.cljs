@@ -61,10 +61,6 @@
             (when (> (count @(rf/subscribe [::current-todo])) 0)
               (rf/dispatch [::add-current-todo])))}
    [:div
-    [ui/app-bar {:title "Title"
-                 :icon-element-right
-                 (r/as-element [ui/icon-button
-                                (ic/action-account-balance-wallet)])}]
     [ui/paper
      [:div "Hello"]
      [ui/raised-button {:label "Blue button"}]
