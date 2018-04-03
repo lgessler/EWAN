@@ -21,10 +21,13 @@
   ;; --------------------
   ;; define routes here
   (defroute "/" []
-    (re-frame/dispatch [::events/set-active-panel :home-panel]))
+    ;; For now, just go to project selection
+    ;; This sets the window's location hash, but unnecessary
+    ;(aset (.-location js/window) "hash" "#/project")
+    (secretary/dispatch! "/project"))
 
-  (defroute "/about" []
-    (re-frame/dispatch [::events/set-active-panel :about-panel]))
+  (defroute "/project" []
+    (re-frame/dispatch [::events/set-active-panel :project-panel]))
 
 
   ;; --------------------

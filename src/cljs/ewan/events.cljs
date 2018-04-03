@@ -1,7 +1,7 @@
 (ns ewan.events
   (:require [re-frame.core :as rf]
             [ewan.db :as db]
-            [ewan.todos :as todos]
+            [ewan.project :as projects]
             [cljsjs.pouchdb]))
 
 ;; ------------------------------------------------------------
@@ -40,7 +40,7 @@
  (fn [{:keys [db]} _]
    {:db
     (merge db/default-db
-           todos/default-db)
+           projects/default-db)
     :pouchdb
     {:method "allDocs"
      :args [{:include_docs true}
@@ -58,7 +58,7 @@
          docs (map #(:doc %) rows)]
      (js/console.log rows)
      (js/console.log (doall docs))
-     (update db :ewan.todos/todos into docs))))
+     (update db :ewan.project/projects into docs))))
 
 (rf/reg-event-fx
  ::save-pdb-docs
@@ -66,7 +66,7 @@
    {:db db
     :pouchdb
     {:method "bulkDocs"
-     :args [(clj->js (:ewan.todos/todos db))
+     :args [(clj->js (:ewan.project/projects db))
             {}
             (fn [error result]
               (if error
@@ -81,12 +81,12 @@
    ;; ignore errors for now
 
    (assoc db
-          :ewan.todos/todos
+          :ewan.project/projects
           (map (fn [row response]
                  (-> row
                      (assoc :_id (get response "id"))
                      (assoc :_rev (get response "rev"))))
-               (:ewan.todos/todos db)
+               (:ewan.project/projects db)
                (js->clj responses)))))
 
 ;; navigation
