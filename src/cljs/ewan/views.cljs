@@ -22,7 +22,5 @@
                   (.-LightRawTheme js/MaterialUIStyles))}
      [:div
       [ui/app-bar {:title "ewan"
-                   :icon-element-right
-                   (r/as-element [ui/icon-button
-                                  (ic/action-feedback)])}]
+                   :show-menu-icon-button false}]
       [panels @active-panel]]]))
