@@ -1,7 +1,7 @@
-(ns ewan.project
+(ns ewan.project.core
   (:require [re-frame.core :as rf]
-            [re-com.core :as re-com]
-            [ewan.eaf30 :as eaf30]
+            [ewan.spec.eaf30 :as eaf30]
+            [ewan.project.form :refer [new-project-dialog-form]]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]
@@ -15,14 +15,6 @@
   {::projects (list {:eaf "Boogie woogie"})
    ::new-project-dialog-open false})
 
-;; ----------------------------------------------------------------------------
-;; spec
-;; ----------------------------------------------------------------------------
-;; spec for the "project", i.e. a row in PouchDB
-
-(spec/def ::eaf eaf30/eaf?)
-(spec/def ::project
-  (spec/keys :req-un [::eaf]))
 
 ;; ----------------------------------------------------------------------------
 ;; subs
@@ -54,24 +46,17 @@
 ;; views
 ;; ----------------------------------------------------------------------------
 
-;; dialog
+;; dialog -- a popup window that contains a form for creating a new project
 
 (defn- open-dialog [] (rf/dispatch [::open-new-project-dialog]))
 (defn- close-dialog [] (rf/dispatch [::close-new-project-dialog]))
-
-
-(defn- new-project-dialog-form []
-  [:form {:on-submit #(js/console.log "Submit")}
-   [:input {:type "text"
-            :placeholder "Name"
-            :value "atom"
-            :on-change #(js/console.log "Changed")}]])
 
 ;; dialog's actions prop expects a js array
 (def ^{:private true} new-project-dialog-actions
   #js[(r/as-element [ui/flat-button {:label "Create"
                                      :primary true
-                                     :on-click close-dialog}])
+                                     :type "submit"
+                                     :form "new-project-dialog-form"}])
       (r/as-element [ui/flat-button {:label "Cancel"
                                      :primary false
                                      :on-click close-dialog}])])
@@ -83,7 +68,7 @@
                 :open @open
                 :actions (r/as-element new-project-dialog-actions)
                 :on-request-close close-dialog}
-     [new-project-dialog-form]]))
+     [new-project-dialog-form close-dialog]]))
 
 (defn- new-project-buttons []
   [:ul {:class-name "new-project__buttons"}
@@ -99,7 +84,7 @@
                        :primary false
                        :icon (ic/file-file-upload)}]]])
 
-;; panel
+;; panel -- top level element
 
 (defn project-panel []
   (let [projects (rf/subscribe [::available-projects])]

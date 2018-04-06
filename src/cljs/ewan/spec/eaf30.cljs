@@ -1,4 +1,4 @@
-(ns ewan.eaf30
+(ns ewan.spec.eaf30
   (:require [cljs.spec.alpha :as s]
             [clojure.data.xml :as xml]
             [cljs-time.format :as timefmt]
@@ -11,15 +11,16 @@
 ;; ----------------------------------------------------------------------------
 ;; Internally, we will be using a Hiccup-like representation of EAF as it is
 ;; losslessly serializable to JSON. Whenever we need to generate EAF for the
-;; user, we will use hiccup->xml, and whenever we need to ingest EAF, we will
-;; use xml->hiccup. Note that unlike normal Hiccup, non-terminal nodes in this
-;; representation MUST have a map present for attributes, even if it is empty,
-;; to align with the conventions of clojure.data.xml.
+;; user, we will use hiccup->eaf-str, and whenever we need to ingest EAF, we
+;; will use eaf-str->hiccup. Note that unlike normal Hiccup, non-terminal nodes
+;; in this representation MUST have a map present for attributes, even if it
+;; is empty, to align with the conventions of clojure.data.xml.
+;;
 ;; NOTE 1: the XSD schema has many types that are more specific than what
-;;         we will specify here. E.g., URL's and numbers in the original XSD
-;;         schema are treated here as strings. Ideally we'd be more specific,
-;;         but it's not worth my time at the moment since it's unlikely these
-;;         would hold corrupt values anyway in most use-cases.
+;; we will specify here. E.g., URL's and numbers in the original XSD schema
+;; are treated here as strings. Ideally we'd be more specific, but it's not
+;; worth my time at the moment since it's unlikely these  would hold corrupt
+;; values anyway in most use-cases. (But of course, it'd be good to have)
 
 (defn- snake->kebab
   [kwd]
@@ -466,7 +467,7 @@
    ))
 
 ;; ----------------------------------------------------------------------------
-;; API
+;; Public API
 ;; ----------------------------------------------------------------------------
 
 (defn eaf-str->hiccup
