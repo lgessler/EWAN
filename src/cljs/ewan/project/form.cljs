@@ -9,12 +9,7 @@
             [goog.functions])
   (:require-macros [cljs.spec.alpha :as spec]))
 
-;; the form displayed in the dialog made in project.core for creating a new
-;; project. Note that the form does not actually contain the Create and
-;; Cancel buttons--rather these are passed into the dialog's `actions` prop,
-;; and the Create button points to the form using the form's ID. Not sure
-;; if this was the cleanest solution--there is at least one more alternative:
-;; https://stackoverflow.com/questions/40881616/how-to-submit-the-form-by-material-ui-dailog-using-reactjs
+;; the form displayed in the dialog made in project.core for 
 
 (def ^{:private true} default-form-state
   {:name ""
@@ -34,12 +29,11 @@
   (fn [e]
     (.preventDefault e)
     (swap! state assoc :name-err (name-error-text (:name @state)))
-    (js/console.log @state)
-    (if (> (count (:name @state)) 0)
-      (submit-callback)
+    (if (> (count (:name-err @state)) 0)
       (.. js/document
           (getElementById "new-project-dialog-form-name-field")
-          focus))))
+          focus)
+      (submit-callback))))
 
 (defn new-project-dialog-form
   "Renders a form that captures the necessary information to create a new
@@ -47,30 +41,26 @@
   after the form has been validated and submitted. This callback should
   probably dispatch a re-frame event."
   [submit-callback]
-  (let [state (r/atom default-form-state)
-        update-name (fn [e]
-                      (let [s (.. e -target -value)]
-                        (swap! state assoc :name s)
-                        (swap! state assoc :name-err (name-error-text s))))]
+  (let [state (r/atom default-form-state)]
     (fn []
-      [:form#new-project-dialog-form {:on-submit (attempt-submit state submit-callback)}
+      [:form#new-project-dialog-form
+       {:on-submit (attempt-submit state submit-callback)}
        [ui/text-field {:id "new-project-dialog-form-name-field"
                        :floating-label-text "Project name"
                        :full-width true
-                       :auto-focus "autofocus"
+                       :floating-label-fixed true
                        :error-text (:name-err @state)
-                       :on-key-press #(when (= (.-keyCode %) 13)
-                                        (attempt-submit state submit-callback))
-                       :on-blur update-name}]
+                       :on-change (fn [_ v]
+                                    (swap! state assoc :name v)
+                                    (swap! state assoc :name-err (name-error-text v)))}]
        [ui/text-field {:floating-label-text "Author"
                        :full-width true
-                       :on-blur #(swap! state assoc :author (-> % .-target .-value))}]
-       [ui/date-picker {:hint-text "Date"
+                       :floating-label-fixed true
+                       :on-change #(swap! state assoc :author %2)}]
+       [ui/date-picker {:style {:margin-top "18px"}
+                        :hint-text "Date"
                         :value (:date @state)
                         :on-change #(swap! state assoc :date %2)}]
-
        ])))
-
-
 
 

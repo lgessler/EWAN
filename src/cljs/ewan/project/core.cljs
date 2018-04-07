@@ -62,7 +62,7 @@
                                      :on-click close-dialog}])])
 
 (defn- new-project-dialog []
-  (let [open (rf/subscribe [::new-project-dialog-open])]
+  (let [open (rf/subscribe [::new-project-dialog-open])] ;; for form ID
     [ui/dialog {:title "Create a new project"
                 :modal false
                 :open @open
