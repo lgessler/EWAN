@@ -67,7 +67,8 @@
                 :modal false
                 :open @open
                 :actions (r/as-element new-project-dialog-actions)
-                :on-request-close close-dialog}
+                :on-request-close close-dialog
+                :auto-scroll-body-content true}
      [new-project-dialog-form close-dialog]]))
 
 (defn- new-project-buttons []
