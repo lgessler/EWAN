@@ -6,7 +6,8 @@
             [cljs-react-material-ui.reagent :as ui]
             [cljs-react-material-ui.icons :as ic]
             [reagent.core :as r]
-            [goog.functions])
+            [cljs.pprint :as pprint]
+            )
   (:require-macros [cljs.spec.alpha :as spec]))
 
 ;; the form displayed in the dialog made in project.core for 
@@ -28,7 +29,8 @@
   "Not guaranteed to be unique, but will be good enough 99% of the time"
   [f]
   {:name (.-name f)
-   :last-mod (.-lastModified f)})
+   :last-mod (.-lastModified f)
+   :size (.-size f)})
 
 (defn- attempt-submit
   [state submit-callback]
@@ -40,6 +42,27 @@
           (getElementById "new-project-dialog-form-name-field")
           focus)
       (submit-callback))))
+
+(defn- one-decimal-trim
+  [f]
+  (pprint/cl-format nil "~,1f" f))
+
+(defn- fmt-size
+  [size]
+  (condp <= size
+    1000000000 (-> size
+                   (/ 1000000000)
+                   one-decimal-trim
+                   (str " GB"))
+    1000000 (-> size
+                (/ 1000000)
+                one-decimal-trim
+                (str " MB"))
+    1000 (-> size
+             (/ 1000)
+             one-decimal-trim
+             (str " KB"))
+    (str size " B")))
 
 (defn new-project-dialog-form
   "Renders a form that captures the necessary information to create a new
@@ -75,16 +98,32 @@
          :on-change #(swap! state assoc :date %2)}]
 
        [:label {:for "new-project-dialog-form-file-upload"} "Media files"]
-       [:ul
-        (for [file (:files @state)]
-          [:li {:key (str (.-lastModified file) (.-name file))}
-           (.-name file)])]
-       [ui/raised-button {:label "Add File"
-                        :primary true
-                        :on-click
-                        #(.. js/document
-                             (getElementById "new-project-dialog-form-file-upload")
-                             click)}]
+       [ui/table
+        {:on-cell-click (fn [row-id]
+                          (swap! state update :files
+                                 #(vec (concat
+                                        (subvec % 0 row-id)
+                                        (subvec % (inc row-id))))))
+         :wrapper-style {:max-height "200px"}
+         :selectable false}
+        [ui/table-body
+         {:display-row-checkbox false
+          :show-row-hover true}
+         (for [file (:files @state)]
+           [ui/table-row {:key (-> file unique-file-map vals str)}
+            [ui/table-row-column 
+             [:div {:line-height "24px"}
+              [:div {:style {:display "inline-block" :vertical-align "middle" :line-height "normal" :width "30px"}}
+               [ic/navigation-close]]
+              [:div {:style {:display "inline-block" :vertical-align "middle" :line-height "normal" :width "auto"}}
+               (.-name file)]]]
+            [ui/table-row-column (fmt-size (.-size file))]])]]
+       [ui/raised-button {:label "Add files"
+                          :primary true
+                          :on-click
+                          #(.. js/document
+                               (getElementById "new-project-dialog-form-file-upload")
+                               click)}]
        [:input
         {:id "new-project-dialog-form-file-upload"
          :type "file"
