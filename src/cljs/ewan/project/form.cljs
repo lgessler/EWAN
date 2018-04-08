@@ -16,13 +16,19 @@
    :name-err ""
    :author ""
    :date (js/Date.)
-   :media-descriptors (list)})
+   :files []})
 
 (defn- name-error-text
   [name]
   (if (> (count name) 0)
     ""
     "Project must have a name."))
+
+(defn- unique-file-map
+  "Not guaranteed to be unique, but will be good enough 99% of the time"
+  [f]
+  {:name (.-name f)
+   :last-mod (.-lastModified f)})
 
 (defn- attempt-submit
   [state submit-callback]
@@ -45,22 +51,54 @@
     (fn []
       [:form#new-project-dialog-form
        {:on-submit (attempt-submit state submit-callback)}
-       [ui/text-field {:id "new-project-dialog-form-name-field"
-                       :floating-label-text "Project name"
-                       :full-width true
-                       :floating-label-fixed true
-                       :error-text (:name-err @state)
-                       :on-change (fn [_ v]
-                                    (swap! state assoc :name v)
-                                    (swap! state assoc :name-err (name-error-text v)))}]
-       [ui/text-field {:floating-label-text "Author"
-                       :full-width true
-                       :floating-label-fixed true
-                       :on-change #(swap! state assoc :author %2)}]
-       [ui/date-picker {:style {:margin-top "18px"}
-                        :hint-text "Date"
-                        :value (:date @state)
-                        :on-change #(swap! state assoc :date %2)}]
+       [:label {:for "new-project-dialog-form-name-field"} "Project name"]
+       [ui/text-field
+        {:id "new-project-dialog-form-name-field"
+         :auto-focus "autofocus"
+         :full-width true
+         :floating-label-fixed true
+         :error-text (:name-err @state)
+         :on-change (fn [_ v]
+                      (swap! state assoc :name v)
+                      (swap! state assoc :name-err (name-error-text v)))}]
+       [:label {:for "new-project-dialog-form-author-field"} "Author"]
+       [ui/text-field
+        {:id "new-project-dialog-form-author-field"
+         :full-width true
+         :floating-label-fixed true
+         :on-change #(swap! state assoc :author %2)}]
+       [:label {:for "new-project-dialog-form-date-picker"} "Date"]
+       [ui/date-picker
+        {:id "new-project-dialog-form-date-picker"
+         :hint-text "Date"
+         :value (:date @state)
+         :on-change #(swap! state assoc :date %2)}]
+
+       [:label {:for "new-project-dialog-form-file-upload"} "Media files"]
+       [:ul
+        (for [file (:files @state)]
+          [:li {:key (str (.-lastModified file) (.-name file))}
+           (.-name file)])]
+       [ui/raised-button {:label "Add File"
+                        :primary true
+                        :on-click
+                        #(.. js/document
+                             (getElementById "new-project-dialog-form-file-upload")
+                             click)}]
+       [:input
+        {:id "new-project-dialog-form-file-upload"
+         :type "file"
+         :multiple "multiple"
+         :style {:display "none"}
+         :on-change
+         (fn [e]
+           (swap! state update :files
+                  (fn [cur-files]
+                    (let [already-present (into #{} (map unique-file-map cur-files))
+                          new-files (filter #(not (contains? already-present (unique-file-map %)))
+                                            (-> e .-target .-files array-seq))]
+                      (into cur-files new-files)))))}]
+
        ])))
 
 
