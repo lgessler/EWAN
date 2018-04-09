@@ -12,7 +12,7 @@
 
 ;; used in events.cljs
 (def ^:export default-db
-  {::projects (list {:eaf "Boogie woogie"})
+  {::projects []
    ::new-project-dialog-open false})
 
 
@@ -42,6 +42,21 @@
  (fn [db _]
    (assoc db ::new-project-dialog-open false)))
 
+;; TODO: files still need to be uploaded. Turn into an -fx and
+;; dispatch a :pouchdb effect
+(rf/reg-event-db
+ ::create-new-project
+ (fn [db [_ {:keys [:name :author :date :files] :as state}]]
+   (js/console.log name author date files)
+   (js/console.log state)
+   (update db
+           ::projects
+           conj
+           {:name name
+            :eaf (eaf30/create-eaf {:author author
+                                    :date (.toISOString date)
+                                    :media-descriptors files})})))
+
 ;; ----------------------------------------------------------------------------
 ;; views
 ;; ----------------------------------------------------------------------------
@@ -61,6 +76,11 @@
                                      :primary false
                                      :on-click close-dialog}])])
 
+(defn- form-submitted-callback
+  [state]
+  (close-dialog)
+  (rf/dispatch [::create-new-project state]))
+
 (defn- new-project-dialog []
   (let [open (rf/subscribe [::new-project-dialog-open])] ;; for form ID
     [ui/dialog {:title "Create a new project"
@@ -69,7 +89,7 @@
                 :actions (r/as-element new-project-dialog-actions)
                 :on-request-close close-dialog
                 :auto-scroll-body-content true}
-     [new-project-dialog-form close-dialog]]))
+     [new-project-dialog-form form-submitted-callback]]))
 
 (defn- new-project-buttons []
   [:ul {:class-name "new-project__buttons"}

@@ -41,7 +41,7 @@
       (.. js/document
           (getElementById "new-project-dialog-form-name-field")
           focus)
-      (submit-callback))))
+      (submit-callback @state))))
 
 (defn- one-decimal-trim
   [f]
@@ -66,9 +66,8 @@
 
 (defn new-project-dialog-form
   "Renders a form that captures the necessary information to create a new
-  project. Takes a single argument, `submit-callback`, which is executed
-  after the form has been validated and submitted. This callback should
-  probably dispatch a re-frame event."
+  project. Takes a single argument, `submit-callback`, which is applied
+  with the form's current state after it has been validated and submitted."
   [submit-callback]
   (let [state (r/atom default-form-state)]
     (fn []
@@ -111,12 +110,18 @@
           :show-row-hover true}
          (for [file (:files @state)]
            [ui/table-row {:key (-> file unique-file-map vals str)}
-            [ui/table-row-column 
-             [:div {:line-height "24px"}
-              [:div {:style {:display "inline-block" :vertical-align "middle" :line-height "normal" :width "30px"}}
-               [ic/navigation-close]]
-              [:div {:style {:display "inline-block" :vertical-align "middle" :line-height "normal" :width "auto"}}
-               (.-name file)]]]
+            [ui/table-row-column
+             [:svg {:view-box "0 0 20 20"
+                    :width "20"
+                    :height "20"
+                    :style {:display "inline-block"
+                            :vertical-align "middle"
+                            :margin-right "12px"
+                            :cursor "pointer"}}
+              [ic/navigation-close]]
+             [:div {:style {:display "inline-block"
+                            :vertical-align "middle"}}
+              (.-name file)]]
             [ui/table-row-column (fmt-size (.-size file))]])]]
        [ui/raised-button {:label "Add files"
                           :primary true
@@ -136,8 +141,6 @@
                     (let [already-present (into #{} (map unique-file-map cur-files))
                           new-files (filter #(not (contains? already-present (unique-file-map %)))
                                             (-> e .-target .-files array-seq))]
-                      (into cur-files new-files)))))}]
-
-       ])))
+                      (into cur-files new-files)))))}]])))
 
 
