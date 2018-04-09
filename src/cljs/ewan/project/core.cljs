@@ -42,20 +42,53 @@
  (fn [db _]
    (assoc db ::new-project-dialog-open false)))
 
-;; TODO: files still need to be uploaded. Turn into an -fx and
-;; dispatch a :pouchdb effect
-(rf/reg-event-db
+;; When a user submits the create new project form, this event is fired.
+(rf/reg-event-fx
  ::create-new-project
- (fn [db [_ {:keys [:name :author :date :files] :as state}]]
-   (js/console.log name author date files)
-   (js/console.log state)
-   (update db
-           ::projects
-           conj
-           {:name name
-            :eaf (eaf30/create-eaf {:author author
-                                    :date (.toISOString date)
-                                    :media-descriptors files})})))
+ (fn [{:keys [db]} [_ {:keys [:name :author :date :files] :as state}]]
+   (let [doc {:name name
+              :eaf (eaf30/create-eaf {:author author
+                                      :date (.toISOString date)
+                                      :media-descriptors files})
+              :_attachments
+              (into {} (for [file files]
+                         [(.-name file) {:content_type (.-type file)
+                                         :data file}]))}]
+     {:db db
+      :pouchdb
+      {:method "post"
+       :args [doc
+              {}
+              (fn [err response]
+                (if err
+                  (throw err)
+                  (rf/dispatch [::new-project-created response])))]}})))
+
+;; Because PouchDB's `post` method is async, ::create-new-project initiates
+;; the creation of the PDB document, and this event is fired after the
+;; document is created.
+;; TODO: proper error handling
+(rf/reg-event-fx
+ ::new-project-created
+ (fn [{:keys [db]} [_ response]]
+   (if-not (.-ok response)
+     (throw response)
+     {:db db
+      :pouchdb {:method "get"
+                :args [(.-id response)
+                       {}
+                       (fn [err doc]
+                         (if err
+                           (throw err)
+                           (rf/dispatch [::new-project-doc-fetched doc])))]}})))
+
+;; Since `post` only tells you whether or not the document was successfully
+;; created and does not give you the document's value, we need to call `get`
+;; so we can update re-frame's DB with the value of the new document.
+(rf/reg-event-db
+ ::new-project-doc-fetched
+ (fn [db [_ doc]]
+   (update db ::projects conj (js->clj doc :keywordize-keys true))))
 
 ;; ----------------------------------------------------------------------------
 ;; views
@@ -113,6 +146,12 @@
      [:h2 "Available projects"]
      [ui/list
       (for [project @projects]
-        [ui/list-item {:primary-text (.toString (clj->js project))}])]
+        [ui/list-item {:primary-text (:name project)
+                       :secondary-text (-> project
+                                           :eaf
+                                           eaf30/date
+                                           js/Date.
+                                           .toLocaleDateString)
+                       :key (:_id project)}])]
      [new-project-buttons]
      [new-project-dialog]]))

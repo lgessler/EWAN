@@ -19,7 +19,7 @@
 (defn- pouchdb-effect
   [{:as request
     :keys [method args]}]
-  (if-not (#{"allDocs" "bulkDocs"} method)
+  (if-not (#{"allDocs" "bulkDocs" "post" "get"} method)
     (throw
      (js/Error. (str "Unsupported PouchDB method: " method))))
 

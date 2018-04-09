@@ -519,3 +519,8 @@
                  :stereotype "Symbolic_Association"}]
    [:constraint {:description "Time alignable annotations within the parent annotation's time interval, gaps are allowed"
                  :stereotype "Included_In"}]])
+
+;; simple getters
+(defn date
+  [hiccup]
+  (-> hiccup second :date))
