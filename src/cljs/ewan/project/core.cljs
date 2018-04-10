@@ -29,6 +29,11 @@
  (fn [db _]
    (::new-project-dialog-open db)))
 
+(rf/reg-sub
+ ::current-project
+ (fn [db _]
+   (::current-project db)))
+
 ;; ----------------------------------------------------------------------------
 ;; events
 ;; ----------------------------------------------------------------------------
@@ -41,6 +46,13 @@
  ::close-new-project-dialog
  (fn [db _]
    (assoc db ::new-project-dialog-open false)))
+
+(rf/reg-event-fx
+ ::open-project
+ (fn [{:keys [db]} [_ id]]
+   {:db (assoc db ::current-project (filter #(= id (:_id %))
+                                            (::projects db)))
+    :dispatch [:ewan.events/set-active-panel :project-panel]}))
 
 ;; When a user submits the create new project form, this event is fired.
 (rf/reg-event-fx
@@ -140,20 +152,29 @@
                        :primary false
                        :icon (ic/file-file-upload)}]]])
 
-;; panel -- top level element
 
-(defn project-panel []
+;; top level panels
+;; -----------------------------------------------------------------------------
+;; panel select panel
+(defn project-select-panel []
   (let [projects (rf/subscribe [::available-projects])]
     [ui/paper {:style {:margin "1em" :padding "1em"}}
      [:h2 "Available projects"]
      [ui/list
       (for [project @projects]
-        [ui/list-item {:primary-text (:name project)
-                       :secondary-text (-> project
-                                           :eaf
-                                           eaf30/get-date
-                                           js/Date.
-                                           .toLocaleDateString)
-                       :key (:_id project)}])]
+        [:a.nostyle {:href (str "#/project/" (:_id project))
+                     :key (:_id project)}
+         [ui/list-item {:primary-text (:name project)
+                        :secondary-text (-> project
+                                            :eaf
+                                            eaf30/get-date
+                                            js/Date.
+                                            .toLocaleDateString)}]])]
      [new-project-buttons]
      [new-project-dialog]]))
+
+;; project panel
+;; -----------------------------------------------------------------------------
+(defn project-panel []
+  (r/with-let [doc (rf/subscribe [::current-project])]
+    [:div (str @doc)]))

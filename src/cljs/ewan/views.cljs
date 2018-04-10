@@ -3,7 +3,8 @@
             [re-com.core :as re-com]
             [ewan.subs :as subs]
             [ewan.events :as events]
-            [ewan.project.core :refer [project-panel]]
+            [ewan.project.core :refer [project-select-panel
+                                       project-panel]]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core :refer [get-mui-theme color]]
             [cljs-react-material-ui.reagent :as ui]
@@ -12,6 +13,7 @@
 
 (defn- panels [panel-name]
   (case panel-name
+    :project-select-panel [project-select-panel]
     :project-panel [project-panel]
     [:div]))
 
