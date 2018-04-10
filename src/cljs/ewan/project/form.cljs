@@ -10,8 +10,7 @@
             )
   (:require-macros [cljs.spec.alpha :as spec]))
 
-;; the form displayed in the dialog made in project.core for 
-
+;; the form displayed in the dialog made in project.core
 (def ^{:private true} default-form-state
   {:name ""
    :name-err ""
@@ -69,7 +68,7 @@
   project. Takes a single argument, `submit-callback`, which is applied
   with the form's current state after it has been validated and submitted."
   [submit-callback]
-  (let [state (r/atom default-form-state)]
+  (r/with-let [state (r/atom default-form-state)]
     (fn []
       [:form#new-project-dialog-form
        {:on-submit (attempt-submit state submit-callback)}

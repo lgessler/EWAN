@@ -129,7 +129,7 @@
   (rf/dispatch [::create-new-project state]))
 
 (defn- new-project-dialog []
-  (let [open (rf/subscribe [::new-project-dialog-open])] ;; for form ID
+  (r/with-let [open (rf/subscribe [::new-project-dialog-open])] ;; for form ID
     [ui/dialog {:title "Create a new project"
                 :modal false
                 :open @open
@@ -157,7 +157,7 @@
 ;; -----------------------------------------------------------------------------
 ;; panel select panel
 (defn project-select-panel []
-  (let [projects (rf/subscribe [::available-projects])]
+  (r/with-let [projects (rf/subscribe [::available-projects])]
     [ui/paper {:style {:margin "1em" :padding "1em"}}
      [:h2 "Available projects"]
      [ui/list

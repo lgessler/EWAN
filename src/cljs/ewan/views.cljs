@@ -18,7 +18,7 @@
     [:div]))
 
 (defn main-panel []
-  (let [active-panel (re-frame/subscribe [::subs/active-panel])]
+  (r/with-let [active-panel (re-frame/subscribe [::subs/active-panel])]
     [ui/mui-theme-provider
      {:mui-theme (get-mui-theme
                   (.-LightRawTheme js/MaterialUIStyles))}
