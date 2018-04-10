@@ -7,6 +7,7 @@
             [re-frame.core :as re-frame]
             [ewan.events :as events]
             [ewan.project.core :as project]
+            [ewan.project.edit :as prjedit]
             ))
 
 (defn hook-browser-navigation! []
@@ -31,7 +32,7 @@
     (re-frame/dispatch [::events/set-active-panel :project-select-panel]))
 
   (defroute "/project/:id" [id]
-    (re-frame/dispatch [::project/open-project id]))
+    (re-frame/dispatch [::prjedit/open-project id]))
 
 
   ;; --------------------

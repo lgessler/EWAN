@@ -2,13 +2,12 @@
   (:require [re-frame.core :as rf]
             [ewan.spec.eaf30 :as eaf30]
             [ewan.project.form :refer [new-project-dialog-form]]
+            [ewan.project.edit :refer [project-edit-panel-body]]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]
             [cljs-react-material-ui.icons :as ic]
-            [reagent.core :as r]
-            [cljs.spec.alpha :as spec])
-  (:require-macros [cljs.spec.alpha :as spec]))
+            [reagent.core :as r]))
 
 ;; used in events.cljs
 (def ^:export default-db
@@ -28,11 +27,6 @@
  (fn [db _]
    (::new-project-dialog-open db)))
 
-(rf/reg-sub
- ::current-project
- (fn [db _]
-   (::current-project db)))
-
 ;; ----------------------------------------------------------------------------
 ;; events
 ;; ----------------------------------------------------------------------------
@@ -45,26 +39,6 @@
  ::close-new-project-dialog
  (fn [db _]
    (assoc db ::new-project-dialog-open false)))
-
-;; These two events are used to fetch a doc when entering #/project/:id
-(rf/reg-event-fx
- ::open-project
- (fn [{:keys [db]} [_ id]]
-   {:db db
-    :pouchdb {:method "get"
-              :args [id
-                     {:attachments true
-                      :binary true}
-                     (fn [err doc]
-                       (if err
-                         (throw err)
-                         (rf/dispatch [::project-doc-fetched doc])))]}
-    :dispatch [:ewan.events/set-active-panel :project-panel]}))
-
-(rf/reg-event-db
- ::project-doc-fetched
- (fn [db [_ doc]]
-   (assoc db ::current-project doc)))
 
 ;; When a user submits the create new project form, this event is fired.
 (rf/reg-event-fx
@@ -185,9 +159,7 @@
      [new-project-buttons]
      [new-project-dialog]]))
 
-;; project panel
+;; project edit panel
 ;; -----------------------------------------------------------------------------
-(defn project-panel []
-  (r/with-let [doc (rf/subscribe [::current-project])]
-    (js/console.log @doc)
-    [:div (str @doc)]))
+(defn project-edit-panel []
+  [project-edit-panel-body])
