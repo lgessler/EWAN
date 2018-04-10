@@ -86,15 +86,15 @@
   "A hack necessary to restore attributes on the XML string since
   clojure.data.xml was too inconvenient to work with. Takes something like
 
-  <?xml version=\"1.0\" encoding=\"UTF-8\"?>
-  <ANNOTATION_DOCUMENT [...]>
+      <?xml version=\"1.0\" encoding=\"UTF-8\"?>
+      <ANNOTATION_DOCUMENT [...]>
 
   and turns it into
 
-  <?xml version=\"1.0\" encoding=\"UTF-8\"?>
-  <ANNOTATION_DOCUMENT [...]
-      xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"
-      xsi:noNamespaceSchemaLocation=\"http://www.mpi.nl/tools/elan/EAFv2.8.xsd\">"
+      <?xml version=\"1.0\" encoding=\"UTF-8\"?>
+      <ANNOTATION_DOCUMENT [...]
+          xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"
+          xsi:noNamespaceSchemaLocation=\"http://www.mpi.nl/tools/elan/EAFv2.8.xsd\">"
   [xml-str]
   (string/replace-first
    xml-str
@@ -492,10 +492,13 @@
       add-annotation-document-attrs))
 
 (defn eaf?
+  "Tests whether the hiccup supplied conforms to the EAF 3.0 spec"
   [hiccup]
   (s/valid? ::annotation-document hiccup))
 
 (defn create-eaf
+  "Creates a new, minimal set of EAF 3.0 hiccup, roughly mimicking what
+  ELAN 5.1 does when it creates a fresh project."
   [{:keys [:author :date :media-descriptors]}]
   [:annotation-document {:author author
                          :date date
@@ -541,20 +544,21 @@
 
 ;; helper funcs
 (defn- right-while
+  "Call z/right while (pred (z/node zipper)) is true"
   [zipper pred]
   (if (pred (z/node zipper))
     (recur (z/right zipper) pred)
     zipper))
 
 (defn- update-right-while
+  "Like right-while, but also updates each node that tests true with
+  the value of (func (z/node zipper))"
   [zipper pred func]
   (if (pred (z/node zipper))
     (recur (z/right (z/replace zipper (func (z/node zipper)))) pred func)
     zipper))
 
-(defn- filter2
-  [coll pred]
-  (filter pred coll))
+(defn- filter2 [coll pred] (filter pred coll))
 
 ;; defzipfn is a macro that generates something like this:
 ;; (defn <name> [hiccup] (-> hiccup hiccup-zipper <arg1> <arg2> ...))
@@ -566,7 +570,7 @@
   z/children
   (filter2 #(= (first %) :media-descriptor)))
 
-#_ (def tst (create-eaf {:author "Luke"
-                         :date "qwe"
-                         :media-descriptors [{:mime-type "application/mp4" :media-url "qwkle.mp4"}
-                                             {:mime-type "app/avi" :media-url "avi.com"}]}))
+; (def tst (create-eaf {:author "Luke"
+;                         :date "qwe"
+;                         :media-descriptors [{:mime-type "application/mp4" :media-url "qwkle.mp4"}
+;                                             {:mime-type "app/avi" :media-url "avi.com"}]}))
