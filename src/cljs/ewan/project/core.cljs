@@ -49,7 +49,9 @@
    (let [doc {:name name
               :eaf (eaf30/create-eaf {:author author
                                       :date (.toISOString date)
-                                      :media-descriptors files})
+                                      :media-descriptors (for [file files]
+                                                           {:media-url (.-name file)
+                                                            :mime-type (.-type file)})})
               :_attachments
               (into {} (for [file files]
                          [(.-name file) {:content_type (.-type file)
@@ -149,7 +151,7 @@
         [ui/list-item {:primary-text (:name project)
                        :secondary-text (-> project
                                            :eaf
-                                           eaf30/date
+                                           eaf30/get-date
                                            js/Date.
                                            .toLocaleDateString)
                        :key (:_id project)}])]
