@@ -1,3 +1,4 @@
+;*CLJSBUILD-MACRO-FILE*;
 (ns ewan.spec.eaf30)
 
 (defmacro defzipfn
