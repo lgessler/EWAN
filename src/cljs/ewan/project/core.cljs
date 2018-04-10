@@ -15,7 +15,6 @@
   {::projects []
    ::new-project-dialog-open false})
 
-
 ;; ----------------------------------------------------------------------------
 ;; subs
 ;; ----------------------------------------------------------------------------
@@ -47,12 +46,25 @@
  (fn [db _]
    (assoc db ::new-project-dialog-open false)))
 
+;; These two events are used to fetch a doc when entering #/project/:id
 (rf/reg-event-fx
  ::open-project
  (fn [{:keys [db]} [_ id]]
-   {:db (assoc db ::current-project (filter #(= id (:_id %))
-                                            (::projects db)))
+   {:db db
+    :pouchdb {:method "get"
+              :args [id
+                     {:attachments true
+                      :binary true}
+                     (fn [err doc]
+                       (if err
+                         (throw err)
+                         (rf/dispatch [::project-doc-fetched doc])))]}
     :dispatch [:ewan.events/set-active-panel :project-panel]}))
+
+(rf/reg-event-db
+ ::project-doc-fetched
+ (fn [db [_ doc]]
+   (assoc db ::current-project doc)))
 
 ;; When a user submits the create new project form, this event is fired.
 (rf/reg-event-fx
@@ -177,4 +189,5 @@
 ;; -----------------------------------------------------------------------------
 (defn project-panel []
   (r/with-let [doc (rf/subscribe [::current-project])]
+    (js/console.log @doc)
     [:div (str @doc)]))
