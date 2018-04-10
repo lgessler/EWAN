@@ -558,9 +558,9 @@
 
 ;; defzipfn is a macro that generates something like this:
 ;; (defn <name> [hiccup] (-> hiccup hiccup-zipper <arg1> <arg2> ...))
-(defzipfn get-date second :date)
-(defzipfn get-author second :author)
-(defzipfn get-version second :version)
+(defzipfn get-date z/node second :date)
+(defzipfn get-author z/node second :author)
+(defzipfn get-version z/node second :version)
 (defzipfn get-media-descriptors
   z/down
   z/children
@@ -570,11 +570,3 @@
                          :date "qwe"
                          :media-descriptors [{:mime-type "application/mp4" :media-url "qwkle.mp4"}
                                              {:mime-type "app/avi" :media-url "avi.com"}]}))
-
-
-
-
-
-
-
-
