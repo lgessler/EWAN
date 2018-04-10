@@ -3,8 +3,10 @@
             [clojure.data.xml :as xml]
             [cljs-time.format :as timefmt]
             [cljs.pprint :refer [pprint]]
-            [clojure.string :as string])
-  (:require-macros [cljs.spec.alpha :as s]))
+            [clojure.string :as string]
+            [clojure.zip :as z])
+  (:require-macros [cljs.spec.alpha :as s]
+                   [ewan.spec.eaf30 :refer [defzipfn]]))
 
 ;; ----------------------------------------------------------------------------
 ;; Conversion functions
@@ -469,6 +471,7 @@
 ;; ----------------------------------------------------------------------------
 ;; Public API
 ;; ----------------------------------------------------------------------------
+;; (Refer to the conversion functions at the beginning of this file.)
 
 (defn eaf-str->hiccup
   "Takes the raw text of an EAF file, parses it into XML, and gives the hiccup
@@ -520,7 +523,58 @@
    [:constraint {:description "Time alignable annotations within the parent annotation's time interval, gaps are allowed"
                  :stereotype "Included_In"}]])
 
-;; simple getters
-(defn date
-  [hiccup]
-  (-> hiccup second :date))
+
+;; Getters and setters
+;; ----------------------------------------------------------------------------
+;; Internally, we will use clojure.zip, as it's probably the most ergonomic way
+;; of manipulating this rather large hiccup structure.
+
+(defn- hiccup-zipper
+  "Returns a zipper for Hiccup forms, given a root form."
+  [root]
+  (let [children-pos #(if (map? (second %)) 2 1)]
+    (z/zipper
+     vector?
+     #(drop (children-pos %) %) ; get children
+     #(into [] (concat (take (children-pos %1) %1) %2)) ; make new node
+     root)))
+
+;; helper funcs
+(defn- right-while
+  [zipper pred]
+  (if (pred (z/node zipper))
+    (recur (z/right zipper) pred)
+    zipper))
+
+(defn- update-right-while
+  [zipper pred func]
+  (if (pred (z/node zipper))
+    (recur (z/right (z/replace zipper (func (z/node zipper)))) pred func)
+    zipper))
+
+(defn- filter2
+  [coll pred]
+  (filter pred coll))
+
+;; defzipfn is a macro that generates something like this:
+;; (defn <name> [hiccup] (-> hiccup hiccup-zipper <arg1> <arg2> ...))
+(defzipfn get-date second :date)
+(defzipfn get-author second :author)
+(defzipfn get-version second :version)
+(defzipfn get-media-descriptors
+  z/down
+  z/children
+  (filter2 #(= (first %) :media-descriptor)))
+
+#_ (def tst (create-eaf {:author "Luke"
+                         :date "qwe"
+                         :media-descriptors [{:mime-type "application/mp4" :media-url "qwkle.mp4"}
+                                             {:mime-type "app/avi" :media-url "avi.com"}]}))
+
+
+
+
+
+
+
+
