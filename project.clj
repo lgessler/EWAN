@@ -10,21 +10,22 @@
                  [secretary "1.2.3"]
                  [re-frame "0.10.2"]
 
-                 ;; ???
-                 [com.andrewmcveigh/cljs-time "0.5.0"]
-
                  ;; views
                  [reagent "0.7.0"]
                  [cljsjs/react "15.6.1-1"]
                  [cljsjs/react-dom "15.6.1-1"]
-                 [cljs-react-material-ui "0.2.48"]]
+                 [cljs-react-material-ui "0.2.48"]
+
+                 ;; used for time formatting
+                 [com.andrewmcveigh/cljs-time "0.5.0"]
+                 ]
 
   :plugins [[lein-cljsbuild "1.1.5"]
             [lein-less "1.7.5"]]
 
   :min-lein-version "2.5.3"
 
-  :source-paths ["src/clj"]
+  :source-paths []
 
   :clean-targets ^{:protect false} ["resources/public/js/compiled" "target"
                                     "test/js"]
