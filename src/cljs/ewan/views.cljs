@@ -1,7 +1,6 @@
 (ns ewan.views
-  (:require [re-frame.core :as re-frame]
+  (:require [re-frame.core :as rf]
             [re-com.core :as re-com]
-            [ewan.subs :as subs]
             [ewan.events :as events]
             [ewan.project.core :refer [project-select-panel
                                        project-edit-panel]]
@@ -18,7 +17,7 @@
     [:div]))
 
 (defn main-panel []
-  (r/with-let [active-panel (re-frame/subscribe [::subs/active-panel])]
+  (r/with-let [active-panel (rf/subscribe [:ewan.core/active-panel])]
     [ui/mui-theme-provider
      {:mui-theme (get-mui-theme
                   (.-LightRawTheme js/MaterialUIStyles))}

@@ -34,12 +34,14 @@
 ;; db events
 ;; ------------------------------------------------------------
 
+(def ^:private default-db {})
+
 ;; initialization
 (rf/reg-event-fx
  ::initialize-db
  (fn [{:keys [db]} _]
    {:db
-    (merge db/default-db
+    (merge default-db
            project/default-db)
     :pouchdb
     {:method "allDocs"
@@ -89,9 +91,5 @@
                (::project/projects db)
                (js->clj responses)))))
 
-;; navigation
-(rf/reg-event-db
- ::set-active-panel
- (fn [db [_ active-panel]]
-   (assoc db :active-panel active-panel)))
+
 
