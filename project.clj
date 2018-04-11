@@ -14,7 +14,6 @@
                  [com.andrewmcveigh/cljs-time "0.5.0"]
 
                  ;; views
-                 [re-com "2.1.0"]
                  [reagent "0.7.0"]
                  [cljsjs/react "15.6.1-1"]
                  [cljsjs/react-dom "15.6.1-1"]
