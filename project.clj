@@ -30,7 +30,8 @@
   :clean-targets ^{:protect false} ["resources/public/js/compiled" "target"
                                     "test/js"]
 
-  :figwheel {:css-dirs ["resources/public/css"]}
+  :figwheel {:css-dirs ["resources/public/css"]
+             :reload-clj-files {:clj true :cljc false}}
 
   :less {:source-paths ["less"]
          :target-path  "resources/public/css"}
