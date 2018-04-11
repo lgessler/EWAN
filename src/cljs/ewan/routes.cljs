@@ -5,7 +5,6 @@
             [goog.events :as gevents]
             [goog.history.EventType :as EventType]
             [re-frame.core :as re-frame]
-            [ewan.events :as events]
             [ewan.project.core :as project]
             [ewan.project.edit :as prjedit]
             ))
@@ -29,7 +28,7 @@
     (secretary/dispatch! "/project"))
 
   (defroute "/project" []
-    (re-frame/dispatch [::events/set-active-panel :project-select-panel]))
+    (re-frame/dispatch [:ewan.views/set-active-panel :project-select-panel]))
 
   (defroute "/project/:id" [id]
     (re-frame/dispatch [::prjedit/open-project id]))

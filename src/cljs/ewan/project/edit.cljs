@@ -27,7 +27,7 @@
                        (if err
                          (throw err)
                          (rf/dispatch [::project-doc-fetched doc])))]}
-    :dispatch [:ewan.core/set-active-panel :project-edit-panel]}))
+    :dispatch [:ewan.views/set-active-panel :project-edit-panel]}))
 
 (rf/reg-event-db
  ::project-doc-fetched

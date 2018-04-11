@@ -1,6 +1,5 @@
-(ns ewan.events
+(ns ewan.db
   (:require [re-frame.core :as rf]
-            [ewan.db :as db]
             [ewan.project.core :as project]
             [cljsjs.pouchdb]))
 

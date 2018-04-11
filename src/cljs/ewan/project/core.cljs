@@ -9,7 +9,7 @@
             [cljs-react-material-ui.icons :as ic]
             [reagent.core :as r]))
 
-;; used in events.cljs
+;; used in db.cljs
 (def ^:export default-db
   {::projects []
    ::new-project-dialog-open false})
