@@ -74,3 +74,9 @@
                                          :media-descriptors
                                          [{:mime-type "video/mp4" :media-url "a.mp4"}
                                           {:mime-type "audio/wav" :media-url "a.wav"}]}))
+
+(deftest get-0
+  (testing "get-date returns annotation-document's date"
+    (is (= "2018-03-24T18:09:00-06:00"
+           (eaf/get-date mini-eaf)))))
+
