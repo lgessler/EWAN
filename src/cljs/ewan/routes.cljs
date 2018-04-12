@@ -5,8 +5,6 @@
             [goog.events :as gevents]
             [goog.history.EventType :as EventType]
             [re-frame.core :as re-frame]
-            [ewan.project.core :as project]
-            [ewan.project.edit :as prjedit]
             ))
 
 (defn hook-browser-navigation! []
@@ -31,7 +29,7 @@
     (re-frame/dispatch [:ewan.views/set-active-panel :project-select-panel]))
 
   (defroute "/project/:id" [id]
-    (re-frame/dispatch [::prjedit/open-project id]))
+    (re-frame/dispatch [:ewan.project.edit/open-project id]))
 
 
   ;; --------------------
