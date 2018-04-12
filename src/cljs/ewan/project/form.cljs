@@ -10,6 +10,9 @@
             )
   (:require-macros [cljs.spec.alpha :as spec]))
 
+;; TODO: some areas of this code use getElementById--they should use refs instead.
+;; See: https://gist.github.com/pesterhazy/4d9df2edc303e5706d547aeabe0e17e1
+
 ;; the form displayed in the dialog made in project.core
 (def ^{:private true} default-form-state
   {:name ""
