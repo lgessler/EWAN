@@ -31,7 +31,7 @@
                                     "test/js"]
 
   :figwheel {:css-dirs ["resources/public/css"]
-             :reload-clj-files {:clj true :cljc false}}
+             :reload-clj-files {:clj true :cljc true}}
 
   :less {:source-paths ["less"]
          :target-path  "resources/public/css"}
@@ -42,11 +42,11 @@
   {:dev
    {:dependencies [[binaryage/devtools "0.9.4"]
                    [day8.re-frame/trace "0.1.14"]
-                   [figwheel-sidecar "0.5.13"]
+                   [figwheel-sidecar "0.5.15"]
                    [com.cemerick/piggieback "0.2.2"]
                    [re-frisk "0.5.3"]]
 
-    :plugins      [[lein-figwheel "0.5.13"]
+    :plugins      [[lein-figwheel "0.5.15"]
                    [lein-doo "0.1.8"]]}}
 
   :cljsbuild
