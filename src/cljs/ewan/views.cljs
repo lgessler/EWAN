@@ -1,6 +1,5 @@
 (ns ewan.views
   (:require [re-frame.core :as rf]
-            [re-com.core :as re-com]
             [ewan.project.core :refer [project-select-panel
                                        project-edit-panel]]
             [cljsjs.material-ui]
