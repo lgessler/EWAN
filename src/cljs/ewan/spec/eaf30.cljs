@@ -569,8 +569,3 @@
   z/down
   z/children
   (filter2 #(= (first %) :media-descriptor)))
-
-; (def tst (create-eaf {:author "Luke"
-;                         :date "qwe"
-;                         :media-descriptors [{:mime-type "application/mp4" :media-url "qwkle.mp4"}
-;                                             {:mime-type "app/avi" :media-url "avi.com"}]}))
