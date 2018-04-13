@@ -14,6 +14,7 @@
                  [reagent "0.7.0"]
                  [cljsjs/react "15.6.1-1"]
                  [cljsjs/react-dom "15.6.1-1"]
+
                  [cljs-react-material-ui "0.2.48"]
 
                  ;; used for time formatting
@@ -25,6 +26,8 @@
 
   :min-lein-version "2.5.3"
 
+  ;; point this to src/cljs for the macro files that are in there (currently
+  ;; there's only eaf30.clj).
   :source-paths ["src/cljs"]
 
   :clean-targets ^{:protect false} ["resources/public/js/compiled" "target"
