@@ -23,6 +23,18 @@
    (::playback db)))
 
 ;; ----------------------------------------------------------------------------
+;; effects
+;; ----------------------------------------------------------------------------
+;; the video effect is used when a component other than the `video` element
+;; itself needs to update the time of the playback. The `video` element's
+;; currentTime prop is modified DIRECTLY, and the `on-time-update` event
+;; of the video ensures that re-frame will get told about it.
+(rf/reg-fx
+ :video
+ (fn [{:keys [video time]}]
+   (set! (.-currentTime video) time)))
+
+;; ----------------------------------------------------------------------------
 ;; events
 ;; ----------------------------------------------------------------------------
 ;; These two events are used to fetch a doc when entering #/project/:id
@@ -60,6 +72,7 @@
          (assoc ::current-project doc)
          (update ::playback merge (first (videos doc)))))))
 
+;; These events are used by many components to control playback
 (rf/reg-event-db
  ::toggle-playback
  (fn [db _]
@@ -67,9 +80,16 @@
 
 (rf/reg-event-db
  ::time-updated
- (fn [db [_ e]]
-   (js/console.log e)
-   db))
+ (fn [db [_ time]]
+   (js/console.log "Time updated: " time)
+   (assoc-in db [::playback :time] time)))
+
+(rf/reg-event-fx
+ ::set-time
+ (fn [{:keys [db]} [_ video time]]
+   {:db db
+    :video {:video video
+            :time time}}))
 
 ;; ----------------------------------------------------------------------------
 ;; views
@@ -88,8 +108,9 @@
           (let [{:keys [play] :as playback} (r/props comp)
                 video @!video]
             (cond (and play (.-paused video)) (.play video)
-                  (not play) (.pause video))
-            ))]
+                  (not play) (do
+                               (.pause video)
+                               (rf/dispatch [::time-updated (.-currentTime video)])))))]
     (r/create-class
      {:component-did-update update
       :component-did-mount (fn [comp]
@@ -97,19 +118,22 @@
                              (update comp))
       :reagent-render
       (fn []
-        [ui/paper {:style {:width "50%"
-                           :max-width "480px"
-                           :display "flex"
-                           :margin "8px"
-                           :padding "8px"}}
-         [:video.project {:ref #(reset! !video %)
-                          :on-click #(rf/dispatch [::toggle-playback])
-                          :on-time-update #(rf/dispatch [::time-updated (-> % .-target .-currentTime)])}]])})))
+        [:video.project
+         {:ref #(reset! !video %)
+          :on-click #(rf/dispatch [::toggle-playback])
+          :on-time-update #(rf/dispatch [::time-updated (-> % .-target .-currentTime)])}])})))
 
 (defn- media-panel-outer []
   (let [playback (rf/subscribe [::playback])]
     (fn []
-      [media-panel-inner @playback])))
+      [ui/paper {:style {:width "50%"
+                         :max-width "480px"
+                         :display "flex"
+                         :flex-direction "column"
+                         :margin "8px"
+                         :padding "8px"}}
+       [media-panel-inner @playback]
+       [:div.time-container (:time @playback)]])))
 
 (defn- upper-panel []
   [:div.upper-panel
