@@ -160,4 +160,6 @@
       [:div
        [upper-panel]
        [lower-panel]]
-      [:div])))
+      [:div.page-loading
+       [ui/circular-progress {:size 80
+                              :thickness 7}]])))
