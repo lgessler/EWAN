@@ -7,11 +7,17 @@
             [cljs-react-material-ui.icons :as ic]
             [reagent.core :as r]))
 
-(def ^:private default-db {::playback {}})
+(def ^:private default-db {::playback {}
+                           ::loaded false})
 
 ;; ----------------------------------------------------------------------------
 ;; subs
 ;; ----------------------------------------------------------------------------
+(rf/reg-sub
+ ::loaded
+ (fn [db _]
+   (::loaded db)))
+
 (rf/reg-sub
  ::current-project
  (fn [db _]
@@ -52,8 +58,9 @@
                          (rf/dispatch [::project-doc-fetched doc])))]}
     :dispatch [:ewan.views/set-active-panel :project-edit-panel]}))
 
-(defn- video? [t]
-  (= "video" (first (clojure.string/split t #"/"))))
+(defn- video? [t] (= "video" (first (clojure.string/split t #"/"))))
+(defn- audio? [t] (= "audio" (first (clojure.string/split t #"/"))))
+(defn- media? [t] (or (video? t) (audio? t)))
 
 (defn- videos
   [doc]
@@ -61,7 +68,7 @@
        (filter (fn [[fname file]] (video? (:content_type file))))
        (map (fn [[fname file]]
               {:src (.createObjectURL js/URL (:data file))
-               :play true}))))
+               :play false}))))
 
 (rf/reg-event-db
  ::project-doc-fetched
@@ -70,7 +77,8 @@
      (-> db
          (merge default-db)
          (assoc ::current-project doc)
-         (update ::playback merge (first (videos doc)))))))
+         (update ::playback merge (first (videos doc)))
+         (assoc ::loaded true)))))
 
 ;; These events are used by many components to control playback
 (rf/reg-event-db
@@ -146,7 +154,10 @@
                      :padding "8px"}}])
 
 (defn project-edit-panel-body []
-  (r/with-let [doc (rf/subscribe [::current-project])]
-    [:div
-     [upper-panel]
-     [lower-panel]]))
+  (r/with-let [doc (rf/subscribe [::current-project])
+               loaded (rf/subscribe [::loaded])]
+    (if @loaded
+      [:div
+       [upper-panel]
+       [lower-panel]]
+      [:div])))
