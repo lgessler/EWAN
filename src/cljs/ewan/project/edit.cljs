@@ -8,6 +8,7 @@
             [reagent.core :as r]))
 
 (def ^:private default-db {::playback {}
+                           ::media (list)
                            ::loaded false})
 
 ;; ----------------------------------------------------------------------------
@@ -31,14 +32,14 @@
 ;; ----------------------------------------------------------------------------
 ;; effects
 ;; ----------------------------------------------------------------------------
-;; the video effect is used when a component other than the `video` element
-;; itself needs to update the time of the playback. The `video` element's
+;; the media effect is used when a component other than the media element
+;; itself needs to update the time of the playback. The media element's
 ;; currentTime prop is modified DIRECTLY, and the `on-time-update` event
-;; of the video ensures that re-frame will get told about it.
+;; of the media ensures that re-frame will get told about it.
 (rf/reg-fx
- :video
- (fn [{:keys [video time]}]
-   (set! (.-currentTime video) time)))
+ :media
+ (fn [{:keys [media time]}]
+   (set! (.-currentTime media) time)))
 
 ;; ----------------------------------------------------------------------------
 ;; events
@@ -58,26 +59,28 @@
                          (rf/dispatch [::project-doc-fetched doc])))]}
     :dispatch [:ewan.views/set-active-panel :project-edit-panel]}))
 
-(defn- video? [t] (= "video" (first (clojure.string/split t #"/"))))
-(defn- audio? [t] (= "audio" (first (clojure.string/split t #"/"))))
-(defn- media? [t] (or (video? t) (audio? t)))
-
-(defn- videos
+(defn- video-file? [t] (= "video" (first (clojure.string/split t #"/"))))
+(defn- audio-file? [t] (= "audio" (first (clojure.string/split t #"/"))))
+(defn- playable-media? [t] (or (video-file? t) (audio-file? t)))
+(defn- playable-media
   [doc]
   (->> (:_attachments doc)
-       (filter (fn [[fname file]] (video? (:content_type file))))
+       (filter (fn [[fname file]] (playable-media? (:content_type file))))
        (map (fn [[fname file]]
-              {:src (.createObjectURL js/URL (:data file))
+              {:type (if (video-file? (:content_type file)) :video :audio)
+               :src (.createObjectURL js/URL (:data file))
                :play false}))))
 
 (rf/reg-event-db
  ::project-doc-fetched
  (fn [db [_ js-doc]]
-   (let [doc (js->clj js-doc :keywordize-keys true)]
+   (let [doc (js->clj js-doc :keywordize-keys true)
+         file-maps (playable-media doc)]
      (-> db
          (merge default-db)
          (assoc ::current-project doc)
-         (update ::playback merge (first (videos doc)))
+         (update ::media into file-maps)
+         (update ::playback merge (first file-maps))
          (assoc ::loaded true)))))
 
 ;; These events are used by many components to control playback
@@ -89,20 +92,18 @@
 (rf/reg-event-db
  ::time-updated
  (fn [db [_ time]]
-   (js/console.log "Time updated: " time)
    (assoc-in db [::playback :time] time)))
 
 (rf/reg-event-fx
  ::set-time
- (fn [{:keys [db]} [_ video time]]
+ (fn [{:keys [db]} [_ media time]]
    {:db db
-    :video {:video video
+    :media {:media media
             :time time}}))
 
 ;; ----------------------------------------------------------------------------
 ;; views
 ;; ----------------------------------------------------------------------------
-
 
 (defn- upper-right-panel []
   [ui/paper {:style {:width "100%"
@@ -110,26 +111,26 @@
                      :padding "8px"}}])
 
 (defn- media-panel-inner []
-  (let [!video (atom nil)
+  (let [!media (atom nil)
         update
         (fn [comp]
           (let [{:keys [play] :as playback} (r/props comp)
-                video @!video]
-            (cond (and play (.-paused video)) (.play video)
-                  (not play) (do
-                               (.pause video)
-                               (rf/dispatch [::time-updated (.-currentTime video)])))))]
+                media @!media ]
+            (cond (and play (.-paused media)) (.play media)
+                  (not play) (.pause media))))]
     (r/create-class
      {:component-did-update update
       :component-did-mount (fn [comp]
-                             (set! (.-src @!video) (:src (r/props comp)))
+                             (set! (.-src @!media) (:src (r/props comp)))
                              (update comp))
       :reagent-render
-      (fn []
-        [:video.project
-         {:ref #(reset! !video %)
-          :on-click #(rf/dispatch [::toggle-playback])
-          :on-time-update #(rf/dispatch [::time-updated (-> % .-target .-currentTime)])}])})))
+      (fn [props]
+        (if (= (:type props) :video)
+          [:video.project
+           {:ref #(reset! !media %)
+            :on-click #(rf/dispatch [::toggle-playback])
+            :on-time-update #(rf/dispatch [::time-updated (-> % .-target .-currentTime)])}]
+          [:div "Audio"]))})))
 
 (defn- media-panel-outer []
   (let [playback (rf/subscribe [::playback])]
