@@ -70,20 +70,9 @@ a.nostyle:visited {
     cursor: auto;
 }
 
-video.project {
-    object-fit: contain;
-    overflow: hidden; /* I have no idea why this was necessary */
-}
-
-div.time-container {
-    display: flex;
-    font-size: 10px;
-    height: 12px;
-    justify-content: center;
-}
-
-div.button-panel {
-    display: flex;
+div.page-loading {
+    padding-top: 300px;
+    text-align: center;
 }
 
 .upper-panel {
@@ -92,7 +81,20 @@ div.button-panel {
     display: flex;
 }
 
-div.page-loading {
-    padding-top: 300px;
-    text-align: center;
+video.media-panel__video {
+    object-fit: contain;
+    overflow: hidden; /* I have no idea why this was necessary */
+    flex-shrink: 30;
+}
+
+div.media-panel__time-container {
+    display: flex;
+    font-size: 10px;
+    height: 12px;
+    justify-content: center;
+}
+
+div.media-panel__playback-buttons {
+    display: flex;
+    justify-content: center;
 }

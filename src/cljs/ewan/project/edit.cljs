@@ -59,15 +59,30 @@
                          (rf/dispatch [::project-doc-fetched doc])))]}
     :dispatch [:ewan.views/set-active-panel :project-edit-panel]}))
 
-(defn- video-file? [t] (= "video" (first (clojure.string/split t #"/"))))
-(defn- audio-file? [t] (= "audio" (first (clojure.string/split t #"/"))))
-(defn- playable-media? [t] (or (video-file? t) (audio-file? t)))
+;; tests for File objects attached to documents
+(defn- video-file? [file]
+  (-> file
+      :content_type
+      (clojure.string/split #"/")
+      first
+      (= "video")))
+(defn- audio-file? [file]
+  (-> file
+      :content_type
+      (clojure.string/split #"/")
+      first
+      (= "audio")))
+(defn- playable-media?
+  [file]
+  (or (video-file? file) (audio-file? file)))
 (defn- playable-media
+  "Given a document, returns a seq of maps, where each map
+  describes an audio or video file that was attached."
   [doc]
   (->> (:_attachments doc)
-       (filter (fn [[fname file]] (playable-media? (:content_type file))))
-       (map (fn [[fname file]]
-              {:type (if (video-file? (:content_type file)) :video :audio)
+       (filter (fn [[_ file]] (playable-media? file)))
+       (map (fn [[_ file]]
+              {:type (if (video-file? file) :video :audio)
                :src (.createObjectURL js/URL (:data file))
                :play false}))))
 
@@ -105,11 +120,7 @@
 ;; views
 ;; ----------------------------------------------------------------------------
 
-(defn- upper-right-panel []
-  [ui/paper {:style {:width "100%"
-                     :margin "8px"
-                     :padding "8px"}}])
-
+;; media ----------------------------------------------------------------------
 (defn- media-panel-inner []
   (let [!media (atom nil)
         update
@@ -126,11 +137,20 @@
       :reagent-render
       (fn [props]
         (if (= (:type props) :video)
-          [:video.project
+          [:video.media-panel__video
            {:ref #(reset! !media %)
-            :on-click #(rf/dispatch [::toggle-playback])
             :on-time-update #(rf/dispatch [::time-updated (-> % .-target .-currentTime)])}]
           [:div "Audio"]))})))
+
+(defn- time-container [playback]
+  [:div.media-panel__time-container (:time @playback)])
+
+(defn- playback-buttons [playback]
+  [:div.media-panel__playback-buttons
+   [ui/icon-button {:icon-class-name "material-icons"
+                    :on-click #(rf/dispatch [::toggle-playback])}
+    (if (:play @playback) "pause" "play_arrow")]
+   ])
 
 (defn- media-panel-outer []
   (let [playback (rf/subscribe [::playback])]
@@ -139,21 +159,31 @@
                          :max-width "480px"
                          :display "flex"
                          :flex-direction "column"
-                         :margin "8px"
+                         :margin "6px"
                          :padding "8px"}}
        [media-panel-inner @playback]
-       [:div.time-container (:time @playback)]])))
+       [time-container playback]
+       [playback-buttons playback]])))
+
+;; upper right panel ----------------------------------------------------------
+(defn- upper-right-panel []
+  [ui/paper {:style {:width "100%"
+                     :margin "6px"
+                     :padding "8px"}}])
+
 
 (defn- upper-panel []
   [:div.upper-panel
    [media-panel-outer]
    [upper-right-panel]])
 
+;; lower panel ----------------------------------------------------------------
 (defn- lower-panel []
   [ui/paper {:style {:width "100%"
-                     :margin "8px"
+                     :margin "6px"
                      :padding "8px"}}])
 
+;; root element ---------------------------------------------------------------
 (defn project-edit-panel-body []
   (r/with-let [doc (rf/subscribe [::current-project])
                loaded (rf/subscribe [::loaded])]
