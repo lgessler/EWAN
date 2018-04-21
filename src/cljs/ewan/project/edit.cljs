@@ -17,6 +17,7 @@
 (rf/reg-sub ::loaded (fn [db _] (::loaded db)))
 (rf/reg-sub ::current-project (fn [db _] (::current-project db)))
 (rf/reg-sub ::playback (fn [db _] (::playback db)))
+(rf/reg-sub ::media-element (fn [db _] (:media-element (::playback db))))
 
 ;; ----------------------------------------------------------------------------
 ;; effects
@@ -25,6 +26,8 @@
 ;; itself needs to update the time of the playback. The media element's
 ;; currentTime prop is modified DIRECTLY, and the `on-time-update` event
 ;; of the media ensures that re-frame will get told about it.
+;;
+;; currently unused, but might need in the future
 (rf/reg-fx
  :media
  (fn [{:keys [media time type]}]
@@ -106,23 +109,14 @@
  (fn [db [_ elt]]
    (assoc-in db [::playback :media-element] elt)))
 
-(rf/reg-event-fx
- ::set-time
- (fn [{:keys [db]} [_ time]]
-   (let [elt (-> db ::playback :media-element)
-         time (if (= time :end) (.-duration elt) time)]
-     {:db db
-      :media {:media elt
-              :type :set
-              :time time}})))
+(defn- set-time
+  [elt time]
+  (set! (.-currentTime elt) time))
 
-(rf/reg-event-fx
- ::add-time
- (fn [{:keys [db]} [_ time]]
-   {:db db
-    :media {:media (-> db ::playback :media-element)
-            :type :add
-            :time time}}))
+(defn- add-time
+  [elt time]
+  (set! (.-currentTime elt)
+        (+ time (.-currentTime elt))))
 
 (rf/reg-event-db
  ::test
@@ -178,22 +172,23 @@
                    :on-click on-click}
    icon-name])
 (defn- playback-buttons [playback]
-  [:div.media-panel__playback-buttons
-   [playback-button {:on-click #(rf/dispatch [::set-time 0])
-                     :icon-name "first_page"}]
-   [playback-button {:on-click #(rf/dispatch [::add-time -5])
-                     :icon-name "replay_5"}]
-   [playback-button {:on-click #(rf/dispatch [::add-time -0.02])
-                     :icon-name "navigate_before"}]
-   [playback-button {:on-click #(rf/dispatch [::toggle-playback])
-                     :icon-name (if (:play @playback) "pause" "play_arrow")}]
-   [playback-button {:on-click #(rf/dispatch [::add-time 0.02])
-                     :icon-name "navigate_next"}]
-   [playback-button {:on-click #(rf/dispatch [::add-time 5])
-                     :icon-name "forward_5"}]
-   [playback-button {:on-click #(rf/dispatch [::set-time :end])
-                     :icon-name "last_page"}]
-   ])
+  (let [elt (rf/subscribe [::media-element])]
+    [:div.media-panel__playback-buttons
+     [playback-button {:on-click #(set-time @elt 0)
+                       :icon-name "first_page"}]
+     [playback-button {:on-click #(add-time @elt -5)
+                       :icon-name "replay_5"}]
+     [playback-button {:on-click #(add-time @elt -0.02)
+                       :icon-name "navigate_before"}]
+     [playback-button {:on-click #(rf/dispatch [::toggle-playback])
+                       :icon-name (if (:play @playback) "pause" "play_arrow")}]
+     [playback-button {:on-click #(add-time @elt 0.02)
+                       :icon-name "navigate_next"}]
+     [playback-button {:on-click #(add-time @elt 5)
+                       :icon-name "forward_5"}]
+     [playback-button {:on-click #(set-time @elt :end)
+                       :icon-name "last_page"}]
+     ]))
 
 (defn- media-panel-outer []
   (let [playback (rf/subscribe [::playback])]
