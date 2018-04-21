@@ -12,7 +12,7 @@ This will be an experimental port of a minimal feature-subset of [ELAN](https://
 
 ☐ Full ELAN functionality coverage
 
-☐ Memote syncing of projects (this also entails accounts and auth)
+☐ Remote syncing of projects (this also entails accounts and auth)
 
 ☐ Live collaborative editing *à la* Google Docs
 
