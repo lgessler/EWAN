@@ -111,7 +111,10 @@
 
 (defn- set-time
   [elt time]
-  (set! (.-currentTime elt) time))
+  (set! (.-currentTime elt)
+        (if (= time :end)
+          (.-duration elt)
+          time)))
 
 (defn- add-time
   [elt time]
