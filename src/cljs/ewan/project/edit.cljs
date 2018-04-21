@@ -14,20 +14,9 @@
 ;; ----------------------------------------------------------------------------
 ;; subs
 ;; ----------------------------------------------------------------------------
-(rf/reg-sub
- ::loaded
- (fn [db _]
-   (::loaded db)))
-
-(rf/reg-sub
- ::current-project
- (fn [db _]
-   (::current-project db)))
-
-(rf/reg-sub
- ::playback
- (fn [db _]
-   (::playback db)))
+(rf/reg-sub ::loaded (fn [db _] (::loaded db)))
+(rf/reg-sub ::current-project (fn [db _] (::current-project db)))
+(rf/reg-sub ::playback (fn [db _] (::playback db)))
 
 ;; ----------------------------------------------------------------------------
 ;; effects
@@ -38,8 +27,11 @@
 ;; of the media ensures that re-frame will get told about it.
 (rf/reg-fx
  :media
- (fn [{:keys [media time]}]
-   (set! (.-currentTime media) time)))
+ (fn [{:keys [media time type]}]
+   (condp = type
+     ;; no need for bounds checking--HTMLMediaElement takes care of it
+     :add (set! (.-currentTime media) (+ time (.-currentTime media)))
+     :set (set! (.-currentTime media) time))))
 
 ;; ----------------------------------------------------------------------------
 ;; events
@@ -109,47 +101,98 @@
  (fn [db [_ time]]
    (assoc-in db [::playback :time] time)))
 
+(rf/reg-event-db
+ ::set-media-element
+ (fn [db [_ elt]]
+   (assoc-in db [::playback :media-element] elt)))
+
 (rf/reg-event-fx
  ::set-time
- (fn [{:keys [db]} [_ media time]]
+ (fn [{:keys [db]} [_ time]]
+   (let [elt (-> db ::playback :media-element)
+         time (if (= time :end) (.-duration elt) time)]
+     {:db db
+      :media {:media elt
+              :type :set
+              :time time}})))
+
+(rf/reg-event-fx
+ ::add-time
+ (fn [{:keys [db]} [_ time]]
    {:db db
-    :media {:media media
+    :media {:media (-> db ::playback :media-element)
+            :type :add
             :time time}}))
+
+(rf/reg-event-db
+ ::test
+ (fn [db _]
+   (assoc db ::playback (rand-nth (::media db)))))
 
 ;; ----------------------------------------------------------------------------
 ;; views
 ;; ----------------------------------------------------------------------------
 
 ;; media ----------------------------------------------------------------------
-(defn- media-panel-inner []
-  (let [!media (atom nil)
-        update
+(defn- media-panel-inner [media-map]
+  (let [update
         (fn [comp]
-          (let [{:keys [play] :as playback} (r/props comp)
-                media @!media ]
-            (cond (and play (.-paused media)) (.play media)
-                  (not play) (.pause media))))]
+          (let [{:keys [play src media-element] :as playback} (r/props comp)
+                newsrc (:src (r/props comp))]
+
+            ;; TODO: it's really NOT a good idea to have the element in the
+            ;; DB, since it's not serializable and in principle, since
+            ;; the element itself is mutable (even though its reference isn't)
+            ;; the element could disappear from the DB. Cleaner solution
+            ;; would involve creating an atom for the ref, but I couldn't get
+            ;; that to work very well when I tried. Global `def` is even worse.
+            ;; This'll do for now.
+            (when (some? media-element)
+              (when (not= newsrc (.-src media-element))
+                (set! (.-src media-element) newsrc))
+              (cond (and play (.-paused media-element)) (.play media-element)
+                    (not play) (.pause media-element)))))]
     (r/create-class
      {:component-did-update update
       :component-did-mount (fn [comp]
-                             (set! (.-src @!media) (:src (r/props comp)))
                              (update comp))
       :reagent-render
-      (fn [props]
-        (if (= (:type props) :video)
+      (fn [media-map]
+        (if (= (:type media-map) :video)
           [:video.media-panel__video
-           {:ref #(reset! !media %)
-            :on-time-update #(rf/dispatch [::time-updated (-> % .-target .-currentTime)])}]
+           {:ref #(rf/dispatch-sync [::set-media-element %])
+            :on-click #(rf/dispatch [::test])
+            :on-time-update
+            #(rf/dispatch [::time-updated (-> % .-target .-currentTime)])}]
           [:div "Audio"]))})))
 
 (defn- time-container [playback]
   [:div.media-panel__time-container (:time @playback)])
 
+
+(defn- playback-button
+  [{:keys [on-click icon-name]}]
+  [ui/icon-button {:icon-class-name "material-icons"
+                   :icon-style {:width "24px" :height "24px"}
+                   :style {:width "36px" :height "36px" :padding "6px"}
+                   :on-click on-click}
+   icon-name])
 (defn- playback-buttons [playback]
   [:div.media-panel__playback-buttons
-   [ui/icon-button {:icon-class-name "material-icons"
-                    :on-click #(rf/dispatch [::toggle-playback])}
-    (if (:play @playback) "pause" "play_arrow")]
+   [playback-button {:on-click #(rf/dispatch [::set-time 0])
+                     :icon-name "first_page"}]
+   [playback-button {:on-click #(rf/dispatch [::add-time -5])
+                     :icon-name "replay_5"}]
+   [playback-button {:on-click #(rf/dispatch [::add-time -0.02])
+                     :icon-name "navigate_before"}]
+   [playback-button {:on-click #(rf/dispatch [::toggle-playback])
+                     :icon-name (if (:play @playback) "pause" "play_arrow")}]
+   [playback-button {:on-click #(rf/dispatch [::add-time 0.02])
+                     :icon-name "navigate_next"}]
+   [playback-button {:on-click #(rf/dispatch [::add-time 5])
+                     :icon-name "forward_5"}]
+   [playback-button {:on-click #(rf/dispatch [::set-time :end])
+                     :icon-name "last_page"}]
    ])
 
 (defn- media-panel-outer []
@@ -170,7 +213,6 @@
   [ui/paper {:style {:width "100%"
                      :margin "6px"
                      :padding "8px"}}])
-
 
 (defn- upper-panel []
   [:div.upper-panel
