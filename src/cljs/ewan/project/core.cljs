@@ -1,7 +1,8 @@
 (ns ewan.project.core
   (:require [re-frame.core :as rf]
             [ewan.spec.eaf30 :as eaf30]
-            [ewan.project.form :refer [new-project-dialog-form]]
+            [ewan.project.new-form :refer [new-project-dialog-form]]
+            [ewan.project.upload-form :refer [upload-project-dialog-form]]
             [ewan.project.edit :refer [project-edit-panel-body]]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core]
@@ -12,20 +13,15 @@
 ;; used in db.cljs
 (def ^:export default-db
   {::projects []
-   ::new-project-dialog-open false})
+   ::new-project-dialog-open false
+   ::upload-project-dialog-open false})
 
 ;; ----------------------------------------------------------------------------
 ;; subs
 ;; ----------------------------------------------------------------------------
-(rf/reg-sub
- ::available-projects
- (fn [db _]
-   (::projects db)))
-
-(rf/reg-sub
- ::new-project-dialog-open
- (fn [db _]
-   (::new-project-dialog-open db)))
+(rf/reg-sub ::available-projects (fn [db _] (::projects db)))
+(rf/reg-sub ::new-project-dialog-open (fn [db _] (::new-project-dialog-open db)))
+(rf/reg-sub ::upload-project-dialog-open (fn [db _] (::upload-project-dialog-open db)))
 
 ;; ----------------------------------------------------------------------------
 ;; events
@@ -34,11 +30,18 @@
  ::open-new-project-dialog
  (fn [db _]
    (assoc db ::new-project-dialog-open true)))
-
 (rf/reg-event-db
  ::close-new-project-dialog
  (fn [db _]
    (assoc db ::new-project-dialog-open false)))
+(rf/reg-event-db
+ ::open-upload-project-dialog
+ (fn [db _]
+   (assoc db ::upload-project-dialog-open true)))
+(rf/reg-event-db
+ ::close-upload-project-dialog
+ (fn [db _]
+   (assoc db ::upload-project-dialog-open false)))
 
 ;; When a user submits the create new project form, this event is fired.
 (rf/reg-event-fx
@@ -63,6 +66,13 @@
                 (if err
                   (throw err)
                   (rf/dispatch [::new-project-created response])))]}})))
+
+;; Similar event, but for uploading a project
+(rf/reg-event-fx
+ ::upload-new-project
+ (fn [{:keys [db]} [_ {:keys [:name] :as state}]]
+   (js/console.log state)
+   {:db db}))
 
 ;; Because PouchDB's `post` method is async, ::create-new-project initiates
 ;; the creation of the PDB document, and this event is fired after the
@@ -96,8 +106,9 @@
 
 ;; dialog -- a popup window that contains a form for creating a new project
 
-(defn- open-dialog [] (rf/dispatch [::open-new-project-dialog]))
-(defn- close-dialog [] (rf/dispatch [::close-new-project-dialog]))
+;; new project dialog ---------------------------------------------------------
+(defn- open-new-project-dialog [] (rf/dispatch [::open-new-project-dialog]))
+(defn- close-new-project-dialog [] (rf/dispatch [::close-new-project-dialog]))
 
 ;; dialog's actions prop expects a js array
 (def ^{:private true} new-project-dialog-actions
@@ -107,11 +118,11 @@
                                      :form "new-project-dialog-form"}])
       (r/as-element [ui/flat-button {:label "Cancel"
                                      :primary false
-                                     :on-click close-dialog}])])
+                                     :on-click close-new-project-dialog}])])
 
-(defn- form-submitted-callback
+(defn- new-form-submitted-callback
   [state]
-  (close-dialog)
+  (close-new-project-dialog)
   (rf/dispatch [::create-new-project state]))
 
 (defn- new-project-dialog []
@@ -120,9 +131,38 @@
                 :modal false
                 :open @open
                 :actions (r/as-element new-project-dialog-actions)
-                :on-request-close close-dialog
+                :on-request-close close-new-project-dialog
                 :auto-scroll-body-content true}
-     [new-project-dialog-form form-submitted-callback]]))
+     [new-project-dialog-form new-form-submitted-callback]]))
+
+;; upload project dialog ------------------------------------------------------
+(defn- open-upload-project-dialog [] (rf/dispatch [::open-upload-project-dialog]))
+(defn- close-upload-project-dialog [] (rf/dispatch [::close-upload-project-dialog]))
+
+;; dialog's actions prop expects a js array
+(def ^{:private true} upload-project-dialog-actions
+  #js[(r/as-element [ui/flat-button {:label "Create"
+                                     :primary true
+                                     :type "submit"
+                                     :form "upload-project-dialog-form"}])
+      (r/as-element [ui/flat-button {:label "Cancel"
+                                     :primary false
+                                     :on-click close-upload-project-dialog}])])
+
+(defn- upload-form-submitted-callback
+  [state]
+  (close-upload-project-dialog)
+  (rf/dispatch [::upload-new-project state]))
+
+(defn- upload-project-dialog []
+  (r/with-let [open (rf/subscribe [::upload-project-dialog-open])] ;; for form ID
+    [ui/dialog {:title "Create a project"
+                :modal false
+                :open @open
+                :actions (r/as-element upload-project-dialog-actions)
+                :on-request-close close-upload-project-dialog
+                :auto-scroll-body-content true}
+     [upload-project-dialog-form upload-form-submitted-callback]]))
 
 (defn- new-project-buttons []
   [:ul {:class-name "new-project__buttons"}
@@ -131,12 +171,13 @@
                        :label-position "after"
                        :primary true
                        :icon (ic/content-add)
-                       :on-click open-dialog}]]
+                       :on-click open-new-project-dialog}]]
    [:li
     [ui/raised-button {:label "Upload ELAN file"
                        :label-position "after"
                        :primary false
-                       :icon (ic/file-file-upload)}]]])
+                       :icon (ic/file-file-upload)
+                       :on-click open-upload-project-dialog}]]])
 
 
 ;; top level panels
@@ -157,7 +198,8 @@
                                             js/Date.
                                             .toLocaleDateString)}]])]
      [new-project-buttons]
-     [new-project-dialog]]))
+     [new-project-dialog]
+     [upload-project-dialog]]))
 
 ;; project edit panel
 ;; -----------------------------------------------------------------------------
