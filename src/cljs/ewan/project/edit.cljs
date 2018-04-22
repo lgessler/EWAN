@@ -114,6 +114,8 @@
 ;; set with on-time-update firing from the element.
 (defn- set-time!
   [elt time]
+  (when (and (= time :end) (not (.-paused elt)))
+    (rf/dispatch-sync [::toggle-playback]))
   (set! (.-currentTime elt)
         (if (= time :end)
           (.-duration elt)
@@ -121,6 +123,9 @@
 
 (defn- add-time!
   [elt time]
+  (when (and (>= (+ time (.-currentTime elt)) (.-duration elt))
+             (not (.-paused elt)))
+    (rf/dispatch-sync [::toggle-playback]))
   (set! (.-currentTime elt)
         (+ time (.-currentTime elt))))
 
