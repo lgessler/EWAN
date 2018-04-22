@@ -109,22 +109,20 @@
  (fn [db [_ elt]]
    (assoc-in db [::playback :media-element] elt)))
 
-(defn- set-time
+;; These modify the media element's time directly, in keeping with our
+;; convention that the ::playback map's :time value is only ever
+;; set with on-time-update firing from the element.
+(defn- set-time!
   [elt time]
   (set! (.-currentTime elt)
         (if (= time :end)
           (.-duration elt)
           time)))
 
-(defn- add-time
+(defn- add-time!
   [elt time]
   (set! (.-currentTime elt)
         (+ time (.-currentTime elt))))
-
-(rf/reg-event-db
- ::test
- (fn [db _]
-   (assoc db ::playback (rand-nth (::media db)))))
 
 ;; ----------------------------------------------------------------------------
 ;; views
@@ -142,8 +140,8 @@
             ;; the element itself is mutable (even though its reference isn't)
             ;; the element could disappear from the DB. Cleaner solution
             ;; would involve creating an atom for the ref, but I couldn't get
-            ;; that to work very well when I tried. Global `def` is even worse.
-            ;; This'll do for now.
+            ;; that to work very well when I tried. Global `def` is probably
+            ;; even worse. This'll do for now.
             (when (some? media-element)
               (when (not= newsrc (.-src media-element))
                 (set! (.-src media-element) newsrc))
@@ -158,13 +156,27 @@
         (if (= (:type media-map) :video)
           [:video.media-panel__video
            {:ref #(rf/dispatch-sync [::set-media-element %])
-            :on-click #(rf/dispatch [::test])
             :on-time-update
             #(rf/dispatch [::time-updated (-> % .-target .-currentTime)])}]
           [:div "Audio"]))})))
 
+(defn- zero-pad
+  [t]
+  (if (>= t 10)
+    (str (int t))
+    (str "0" (int t))))
+
+(defn- time-format
+  [t]
+  (let [hrs (zero-pad (/ t 3600))
+        mins (zero-pad (/ (mod t 3600) 60))
+        secs (zero-pad (mod t 60))
+        centisecs (zero-pad (* (mod t 1) 100))]
+    (str hrs ":" mins ":" secs "." centisecs)))
+
 (defn- time-container [playback]
-  [:div.media-panel__time-container (:time @playback)])
+  [:div.media-panel__time-container
+   (time-format (:time @playback))])
 
 
 (defn- playback-button
@@ -177,19 +189,19 @@
 (defn- playback-buttons [playback]
   (let [elt (rf/subscribe [::media-element])]
     [:div.media-panel__playback-buttons
-     [playback-button {:on-click #(set-time @elt 0)
+     [playback-button {:on-click #(set-time! @elt 0)
                        :icon-name "first_page"}]
-     [playback-button {:on-click #(add-time @elt -5)
+     [playback-button {:on-click #(add-time! @elt -5)
                        :icon-name "replay_5"}]
-     [playback-button {:on-click #(add-time @elt -0.02)
+     [playback-button {:on-click #(add-time! @elt -0.02)
                        :icon-name "navigate_before"}]
      [playback-button {:on-click #(rf/dispatch [::toggle-playback])
                        :icon-name (if (:play @playback) "pause" "play_arrow")}]
-     [playback-button {:on-click #(add-time @elt 0.02)
+     [playback-button {:on-click #(add-time! @elt 0.02)
                        :icon-name "navigate_next"}]
-     [playback-button {:on-click #(add-time @elt 5)
+     [playback-button {:on-click #(add-time! @elt 5)
                        :icon-name "forward_5"}]
-     [playback-button {:on-click #(set-time @elt :end)
+     [playback-button {:on-click #(set-time! @elt :end)
                        :icon-name "last_page"}]
      ]))
 
