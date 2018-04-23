@@ -90,7 +90,8 @@
          (merge default-db)
          (assoc ::current-project doc)
          (update ::media into file-maps)
-         (update ::playback merge (first file-maps))
+         (update ::playback merge (or (first (filter #(= (:type %) :video) file-maps))
+                                      (first file-maps)))
          (assoc ::loaded true)))))
 
 ;; These events are used by many components to control playback

@@ -70,9 +70,22 @@
 ;; Similar event, but for uploading a project
 (rf/reg-event-fx
  ::upload-new-project
- (fn [{:keys [db]} [_ {:keys [:name] :as state}]]
-   (js/console.log state)
-   {:db db}))
+ (fn [{:keys [db]} [_ {:keys [:name :eaf :files] :as state}]]
+
+   (let [doc {:name name
+              :eaf eaf
+              :_attachments (into {} (for [file files]
+                                       [(.-name file) {:content_type (.-type file)
+                                                       :data file}]))}]
+     {:db db
+      :pouchdb
+      {:method "post"
+       :args [doc
+              {}
+              (fn [err response]
+                (if err
+                  (throw err)
+                  (rf/dispatch [::new-project-created response])))]}})))
 
 ;; Because PouchDB's `post` method is async, ::create-new-project initiates
 ;; the creation of the PDB document, and this event is fired after the

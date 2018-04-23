@@ -18,8 +18,6 @@
 (def ^{:private true} default-form-state
   {:name ""
    :name-err ""
-   :author ""
-   :date (js/Date.)
    :file nil
    :eaf nil
    :files []
@@ -115,8 +113,6 @@
                                 (let [hiccup (eaf30/eaf-str->hiccup
                                               (-> e .-target .-result))]
                                   (swap! state assoc :eaf hiccup)
-                                  (swap! state assoc :author (eaf30/get-author hiccup))
-                                  (swap! state assoc :date (js/Date. (eaf30/get-date hiccup)))
                                   (swap! state update :files into
                                          (map media-descriptor->filename (eaf30/get-media-descriptors hiccup))))))
                         (.readAsText reader file)
@@ -148,19 +144,6 @@
          :on-change (fn [_ v]
                       (swap! state assoc :name v)
                       (swap! state assoc :name-err (name-error-text v)))}]
-       [:label {:for "upload-project-dialog-form-author-field"} "Author"]
-       [ui/text-field
-        {:id "upload-project-dialog-form-author-field"
-         :full-width true
-         :floating-label-fixed true
-         :on-change #(swap! state assoc :author %2)}]
-       [:label {:for "upload-project-dialog-form-date-picker"} "Date"]
-       [ui/date-picker
-        {:id "upload-project-dialog-form-date-picker"
-         :hint-text "Date"
-         :value (:date @state)
-         :on-change #(swap! state assoc :date %2)}]
-
 
        [:label {:for "upload-project-dialog-form-file-upload"} "Media files"]
        [ui/table
