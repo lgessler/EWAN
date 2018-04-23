@@ -126,7 +126,7 @@
          [:div.upload-project-dialog-form__file-selection--filled
           (-> @state :file (aget "name"))]
          [:div.upload-project-dialog-form__file-selection
-          [ui/flat-button
+          [ui/raised-button
            {:primary true
             :label "Upload file"
             :label-position "after"
@@ -181,18 +181,18 @@
          (for [file (:files @state)]
            [ui/table-row {:key (if (string? file)
                                  file
-                                 (-> file unique-file-map vals str))}
+                                 (-> file unique-file-map vals str))
+                          :style (if (or (string? file)
+                                         (not (file-required? (.-name file) state)))
+                                   {:cursor "pointer"}
+                                   {})}
             [ui/table-row-column
-             [:svg {:view-box "0 0 20 20"
-                    :style {:width "20px"
-                            :height "20px"
-                            :display "inline-block"
-                            :vertical-align "middle"
-                            :margin-right "12px"
-                            :cursor "pointer"}}
-              (cond (string? file) [ic/file-file-upload {:style {:color "red"}}]
+             [ui/icon-button
+              {:style {:vertical-align "middle"}}
+              (cond (string? file) [ic/file-file-upload {:color "red"}]
                     (not (file-required? (.-name file) state)) [ic/navigation-close]
-                    :else nil)]
+                    :else [ui/font-icon {:class-name "material-icons"} "done"])]
+
              [:div {:style {:display "inline-block"
                             :vertical-align "middle"}}
               (or (.-name file) file)]]
@@ -203,12 +203,12 @@
                (fmt-size (.-size file)))]])]]
        [:div.upload-project-dialog-form__file-error-text (:files-err @state)]
 
-       [ui/raised-button {:label "Add files"
-                          :primary false
-                          :on-click
-                          #(.. js/document
-                               (getElementById "upload-project-dialog-form-file-upload")
-                               click)}]
+       [ui/flat-button {:label "Add files"
+                        :primary false
+                        :on-click
+                        #(.. js/document
+                             (getElementById "upload-project-dialog-form-file-upload")
+                             click)}]
        [:input
         {:id "upload-project-dialog-form-file-upload"
          :type "file"
