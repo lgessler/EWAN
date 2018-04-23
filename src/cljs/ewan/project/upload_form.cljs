@@ -12,6 +12,7 @@
 
 ;; TODO: some areas of this code use getElementById--they should use refs instead.
 ;; See: https://gist.github.com/pesterhazy/4d9df2edc303e5706d547aeabe0e17e1
+;; I'm so sorry about the quality of this code. I probably won't fix it.
 
 ;; the form displayed in the dialog made in project.core
 (def ^{:private true} default-form-state
@@ -19,13 +20,22 @@
    :name-err ""
    :author ""
    :date (js/Date.)
-   :files []})
+   :file nil
+   :eaf nil
+   :files []
+   :files-err ""})
 
 (defn- name-error-text
   [name]
   (if (> (count name) 0)
     ""
     "Project must have a name."))
+
+(defn- files-error-text
+  [files]
+  (if (some string? files)
+    "You must upload all the media files referenced by this ELAN file."
+    ""))
 
 (defn- unique-file-map
   "Not guaranteed to be unique, but will be good enough 99% of the time"
@@ -39,11 +49,13 @@
   (fn [e]
     (.preventDefault e)
     (swap! state assoc :name-err (name-error-text (:name @state)))
-    (if (> (count (:name-err @state)) 0)
-      (.. js/document
-          (getElementById "upload-project-dialog-form-name-field")
-          focus)
-      (submit-callback @state))))
+    (swap! state assoc :files-err (files-error-text (:files @state)))
+    (cond
+      (> (count (:name-err @state)) 0) (.. js/document
+                                           (getElementById "upload-project-dialog-form-name-field")
+                                           focus)
+      (> (count (:files-err @state)) 0) nil
+      :else (submit-callback @state))))
 
 (defn- one-decimal-trim
   [f]
@@ -73,6 +85,11 @@
       :media-url
       (clojure.string/split #"/")
       last))
+
+(defn- file-required?
+  [filename state]
+  (some #{filename} (map media-descriptor->filename
+                         (eaf30/get-media-descriptors (:eaf @state)))))
 
 (defn upload-project-dialog-form
   "Renders a form that captures the necessary information to create a new
@@ -110,7 +127,7 @@
           (-> @state :file (aget "name"))]
          [:div.upload-project-dialog-form__file-selection
           [ui/flat-button
-           {:primary false
+           {:primary true
             :label "Upload file"
             :label-position "after"
             :icon (ic/file-file-upload)
@@ -148,12 +165,14 @@
        [:label {:for "upload-project-dialog-form-file-upload"} "Media files"]
        [ui/table
         {:on-cell-click (fn [row-id]
-                          (if (string? (nth (:files @state) row-id))
-                            (.click (js/document.getElementById "upload-project-dialog-form-file-upload"))
-                            (swap! state update :files
-                                   #(vec (concat
-                                          (subvec % 0 row-id)
-                                          (subvec % (inc row-id)))))))
+                          (let [file (nth (:files @state) row-id)]
+                            (cond (string? file)
+                                  (.click (js/document.getElementById "upload-project-dialog-form-file-upload"))
+                                  (not (file-required? (.-name file) state))
+                                  (swap! state update :files
+                                         #(vec (concat
+                                                (subvec % 0 row-id)
+                                                (subvec % (inc row-id))))))))
          :wrapper-style {:max-height "200px"}
          :selectable false}
         [ui/table-body
@@ -171,9 +190,9 @@
                             :vertical-align "middle"
                             :margin-right "12px"
                             :cursor "pointer"}}
-              (if (string? file)
-                [ic/file-file-upload {:style {:color "red"}}]
-                [ic/navigation-close])]
+              (cond (string? file) [ic/file-file-upload {:style {:color "red"}}]
+                    (not (file-required? (.-name file) state)) [ic/navigation-close]
+                    :else nil)]
              [:div {:style {:display "inline-block"
                             :vertical-align "middle"}}
               (or (.-name file) file)]]
@@ -182,8 +201,10 @@
              (if (string? file)
                ""
                (fmt-size (.-size file)))]])]]
+       [:div.upload-project-dialog-form__file-error-text (:files-err @state)]
+
        [ui/raised-button {:label "Add files"
-                          :primary true
+                          :primary false
                           :on-click
                           #(.. js/document
                                (getElementById "upload-project-dialog-form-file-upload")
@@ -200,14 +221,12 @@
                     (let [already-present (into #{} (map unique-file-map cur-files))
                           new-files (filter #(not (contains? already-present (unique-file-map %)))
                                             (-> e .-target .-files array-seq))]
-                      (js/console.log (clj->js new-files))
-                      (js/console.log (clj->js cur-files))
-                      (js/console.log (clj->js (map #(.-name %) new-files)))
                       (->> cur-files
                            (filter (fn [file]
                                      (not
                                       (and (string? file)
                                            (some #{file} (map #(.-name %) new-files))))))
-                           (into new-files))))))}]])))
+                           (into new-files)
+                           vec)))))}]])))
 
 
