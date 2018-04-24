@@ -1,6 +1,7 @@
 (ns ewan.project.edit
   (:require [re-frame.core :as rf]
             [ewan.spec.eaf30 :as eaf30]
+            [ewan.project.edit.tiers :refer [tiers]]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]
@@ -245,20 +246,15 @@
    [media-panel-outer]
    [upper-right-panel]])
 
-;; lower panel ----------------------------------------------------------------
-(defn- lower-panel []
-  [ui/paper {:style {:width "100%"
-                     :margin "6px"
-                     :padding "8px"}}])
-
 ;; root element ---------------------------------------------------------------
 (defn project-edit-panel-body []
   (r/with-let [doc (rf/subscribe [::current-project])
+               playback (rf/subscribe [::playback])
                loaded (rf/subscribe [::loaded])]
     (if @loaded
       [:div
        [upper-panel]
-       [lower-panel]]
+       [tiers]]
       [:div.page-loading
        [ui/circular-progress {:size 80
                               :thickness 7}]])))
