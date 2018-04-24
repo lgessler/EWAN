@@ -84,7 +84,7 @@
 (rf/reg-event-db
  ::project-doc-fetched
  (fn [db [_ js-doc]]
-   (let [doc (js->clj js-doc :keywordize-keys true)
+   (let [doc (update (js->clj js-doc :keywordize-keys true) :eaf ewan.db/rekeywordize)
          file-maps (playable-media doc)]
      (-> db
          (merge default-db)
