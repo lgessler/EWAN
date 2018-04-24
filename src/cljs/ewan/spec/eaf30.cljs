@@ -550,6 +550,14 @@
     (recur (z/right zipper) pred)
     zipper))
 
+(defn- take-right-while
+  "Returns a seq of contiguous nodes beginning from the current node and going
+  right such that (pred node) is satisfied for all in the sequence"
+  [zipper pred]
+  (let [node (z/node zipper)]
+    (when (pred node)
+      (cons node (take-right-while (z/right zipper) pred)))))
+
 (defn- update-right-while
   "Like right-while, but also updates each node that tests true with
   the value of (func (z/node zipper))"
@@ -569,3 +577,12 @@
   z/down
   z/children
   (filter2 #(= (first %) :media-descriptor)))
+
+(defzipfn get-tiers
+  z/down
+  (right-while #(not= (first %) :tier))
+  (take-right-while #(= (first %) :tier)))
+
+
+;(def *eaf (:eaf (:ewan.project.edit/current-project re-frame.db.app-db.state)))
+;(def *zip (hiccup-zipper *eaf))
