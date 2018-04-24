@@ -81,10 +81,20 @@
                :src (.createObjectURL js/URL (:data file))
                :play false}))))
 
+(defn- rekeywordize
+  "clj->js destroys keyword information, but luckily we can recover it because
+  we know we're using hiccup. Used on the :eaf key of a PDB document after
+  it is retrieved."
+  [hiccup]
+  (if-not (vector? hiccup)
+    hiccup
+    (into [(keyword (first hiccup))]
+          (map rekeywordize (rest hiccup)))))
+
 (rf/reg-event-db
  ::project-doc-fetched
  (fn [db [_ js-doc]]
-   (let [doc (update (js->clj js-doc :keywordize-keys true) :eaf ewan.db/rekeywordize)
+   (let [doc (update (js->clj js-doc :keywordize-keys true) :eaf rekeywordize)
          file-maps (playable-media doc)]
      (-> db
          (merge default-db)
