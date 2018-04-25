@@ -546,27 +546,31 @@
 (defn- right-while
   "Call z/right while (pred (z/node zipper)) is true"
   [zipper pred]
-  (if (pred (z/node zipper))
-    (recur (z/right zipper) pred)
-    zipper))
+  (when zipper
+    (when-let [node (z/node zipper)]
+      (if (pred node)
+        (recur (z/right zipper) pred)
+        zipper))))
 
 (defn- take-right-while
   "Returns a seq of contiguous nodes beginning from the current node and going
   right such that (pred node) is satisfied for all in the sequence"
   [zipper pred]
-  (let [node (z/node zipper)]
-    (when (pred node)
-      (cons node (take-right-while (z/right zipper) pred)))))
+  (when zipper
+    (when-let [node (z/node zipper)]
+      (when (pred node)
+        (cons node (take-right-while (z/right zipper) pred))))))
 
 (defn- update-right-while
   "Like right-while, but also updates each node that tests true with
   the value of (func (z/node zipper))"
   [zipper pred func]
-  (if (pred (z/node zipper))
-    (recur (z/right (z/replace zipper (func (z/node zipper)))) pred func)
-    zipper))
+  (when zipper
+    (when-let [node (z/node zipper)]
+      (if (pred node)
+        (recur (z/right (z/replace zipper (func node))) pred func)
+        zipper))))
 
-(defn- filter2 [coll pred] (filter pred coll))
 
 ;; defzipfn is a macro that generates something like this:
 ;; (defn <name> [hiccup] (-> hiccup hiccup-zipper <arg1> <arg2> ...))
@@ -575,8 +579,25 @@
 (defzipfn get-version z/node second :version)
 (defzipfn get-media-descriptors
   z/down
-  z/children
-  (filter2 #(= (first %) :media-descriptor)))
+  z/down
+  (take-right-while #(= (first %) :media-descriptor)))
+
+(defzipfn go-to-time-slots
+  z/down
+  z/right
+  z/down)
+
+;; should this really be memoized? seems like it, but think about it
+(def get-time-slot-val
+  (memoize
+   (fn [hiccup time-slot-id]
+     (when-let [elt (-> hiccup
+                        go-to-time-slots
+                        (right-while #(not= time-slot-id
+                                            (-> %
+                                                second
+                                                :time-slot-id))))]
+       (-> elt z/node second :time-value)))))
 
 (defzipfn get-tiers
   z/down
