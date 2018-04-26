@@ -9,6 +9,10 @@
 
 (def default-db {::px-per-sec 150})
 
+;; if you change these, be sure to change the LESS variable as well
+(def ^:private TIER_HEIGHT 32)
+(def ^:private HALF_TIER_HEIGHT 16)
+
 
 ;; ----------------------------------------------------------------------------
 ;; subs
@@ -44,42 +48,54 @@
        eaf30/get-tiers)))
 
 (defn- alignable-annotation
-  [a-ann pps]
-  (let [ppms (/ pps 1000)
+  [a-ann]
+  ;; TODO: find out why time-slot-ref1 and ref2 are sometimes allowed
+  ;; to refer to time-slots without a value
+  (let [pps @(rf/subscribe [::px-per-sec])
+        ppms (/ pps 1000)
         {:keys [time-slot-ref1 time-slot-ref2] :as attrs} (second a-ann)
         start @(rf/subscribe [::time-slot-val time-slot-ref1])
         end @(rf/subscribe [::time-slot-val time-slot-ref2])
         x (* ppms start)
         width (* ppms (- end start))
-        width (if (< x 0) 20 width)] ;; TODO: find out what it means for a time-slot to not have a val
-    [:svg {:height 32 :width width :x x :y 0}
+        width (if (< x 0) 20 width)] 
+    [:svg {:height TIER_HEIGHT :width width :x x :y 0}
      [:path {:stroke "black" :stroke-width 1
-             :d (str "M 0.5 0 l 0 32 M 0.5 16 l " (- width 1) " 0 M " (- width 0.5) " 0 l 0 32")}]
+             :d (str "M 0.5 0 l 0 "
+                     TIER_HEIGHT
+                     " M 0.5 "
+                     HALF_TIER_HEIGHT
+                     " l "
+                     (- width 1)
+                     " 0 M "
+                     (- width 0.5)
+                     " 0 l 0 "
+                     TIER_HEIGHT)}]
      [:text {:x 3 :y 14 :font-size 12}
       (-> a-ann (nth 2) (nth 2))]
      ]))
 
 (defn- annotation
-  [ann pps]
+  [ann]
   (let [ann-type (-> ann (nth 2) first)]
     (condp = ann-type
-      :alignable-annotation [alignable-annotation (nth ann 2) pps]
+      :alignable-annotation [alignable-annotation (nth ann 2)]
       nil)))
 
 (defn- tier-row
-  [tier duration pps]
-  (let [w (* @duration @pps)]
+  [tier]
+  (let [duration (rf/subscribe [::duration])
+        pps (rf/subscribe [::px-per-sec])
+        w (* @duration @pps)]
     [:div.tier-rows__row
-     [:svg {:width w :height "32"}
+     [:svg {:width w :height TIER_HEIGHT}
       (for [ann (drop 2 tier)]
-        ^{:key (-> ann (nth 2) second :annotation-id)} [annotation ann @pps])]]))
+        ^{:key (-> ann (nth 2) second :annotation-id)} [annotation ann])]]))
 
 (defn- tier-rows [tiers]
-  (let [pps (rf/subscribe [::px-per-sec])
-        duration (rf/subscribe [::duration])]
     [:div.tier-rows__container
      (for [tier @tiers]
-       ^{:key (-> tier second :tier-id)} [tier-row tier duration pps])]))
+       ^{:key (-> tier second :tier-id)} [tier-row tier])])
 
 (defn- tier-labels [tiers]
   [:div.tier-labels__container
