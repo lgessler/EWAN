@@ -588,6 +588,7 @@
   z/down)
 
 ;; should this really be memoized? seems like it, but think about it
+;; memoization must happen at the :annotation-document level 
 (def get-time-slot-val
   (memoize
    (fn [hiccup time-slot-id]

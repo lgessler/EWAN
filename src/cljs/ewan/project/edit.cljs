@@ -80,7 +80,8 @@
        (map (fn [[_ file]]
               {:type (if (video-file? file) :video :audio)
                :src (.createObjectURL js/URL (:data file))
-               :play false}))))
+               :play false
+               :duration 0}))))
 
 (defn- rekeywordize
   "clj->js destroys keyword information, but luckily we can recover it because
@@ -99,11 +100,17 @@
          file-maps (playable-media doc)]
      (-> db
          (merge default-db)
+         (merge ewan.project.edit.tiers/default-db)
          (assoc ::current-project doc)
          (update ::media into file-maps)
          (update ::playback merge (or (first (filter #(= (:type %) :video) file-maps))
                                       (first file-maps)))
          (assoc ::loaded true)))))
+
+(rf/reg-event-db
+ ::record-duration
+ (fn [db [_ duration]]
+   (assoc-in db [::playback :duration] duration)))
 
 ;; These events are used by many components to control playback
 (rf/reg-event-db
@@ -173,6 +180,7 @@
         (if (= (:type media-map) :video)
           [:video.media-panel__video
            {:ref #(rf/dispatch-sync [::set-media-element %])
+            :on-loaded-metadata #(rf/dispatch [::record-duration (-> % .-target .-duration)])
             :on-time-update
             #(rf/dispatch [::time-updated (-> % .-target .-currentTime)])}]
           [:div "Audio"]))})))

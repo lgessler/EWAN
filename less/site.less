@@ -121,13 +121,16 @@ div.media-panel__playback-buttons {
 @light-gray: rgba(0,0,0,0.1);
 
 div.tier-labels__container {
+    position: sticky;
+    left: 0px;
     width: 100px;
-    position: fixed;
+    vertical-align: baseline;
+    display: inline-block;
     background-color: white;
     background-clip: content-box;
-    z-index: 9001;
 }
 
+div.tier-labels__row:last-child { border-bottom: none; }
 div.tier-labels__row {
     height: 32px;
     line-height: 32px;
@@ -142,14 +145,22 @@ div.tier-labels__row {
 }
 
 div.tier-rows__container {
-    position: relative;
-    left: 100px;
+    vertical-align: baseline;
     display: inline-block;
 }
 
+div.tier-rows__row:last-child { border: none; }
 div.tier-rows__row {
     height: 32px;
     line-height: 32px;
     border-bottom: 1px solid @light-gray;
     white-space: nowrap;
+}
+
+div.crosshair {
+    position: absolute;
+    top: 0px;
+    width: 1px;
+    border-left: 1px solid red;
+    height: 100%;
 }
