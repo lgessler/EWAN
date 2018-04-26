@@ -1,6 +1,6 @@
 (defproject ewan "0.1.0-SNAPSHOT"
-  :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.9.908"]
+  :dependencies [[org.clojure/clojure "1.9.0"]
+                 [org.clojure/clojurescript "1.10.238"]
                  [org.clojure/data.xml "0.2.0-alpha5"]
 
                  ;; db
@@ -8,20 +8,17 @@
 
                  ;; routing and state management
                  [secretary "1.2.3"]
-                 [re-frame "0.10.2"]
+                 [re-frame "0.10.5"]
 
                  ;; views
-                 [reagent "0.7.0"]
-                 [cljsjs/react "15.6.1-1"]
-                 [cljsjs/react-dom "15.6.1-1"]
-
+                 [reagent "0.8.0"]
                  [cljs-react-material-ui "0.2.48"]
 
                  ;; used for time formatting
                  [com.andrewmcveigh/cljs-time "0.5.0"]
                  ]
 
-  :plugins [[lein-cljsbuild "1.1.5"]
+  :plugins [[lein-cljsbuild "1.1.7"]
             [lein-less "1.7.5"]]
 
   :min-lein-version "2.5.3"
@@ -43,13 +40,13 @@
 
   :profiles
   {:dev
-   {:dependencies [[binaryage/devtools "0.9.4"]
-                   [day8.re-frame/trace "0.1.14"]
-                   [figwheel-sidecar "0.5.13"]
-                   [com.cemerick/piggieback "0.2.2"]
-                   [re-frisk "0.5.3"]]
+   {:dependencies [[binaryage/devtools "0.9.10"]
+                   [day8.re-frame/re-frame-10x "0.3.3-react16"]
+                   [figwheel-sidecar "0.5.15"]
+                   [org.clojure/tools.nrepl "0.2.13"]
+                   [com.cemerick/piggieback "0.2.1"]]
 
-    :plugins      [[lein-figwheel "0.5.13"]
+    :plugins      [[lein-figwheel "0.5.15"]
                    [lein-doo "0.1.8"]]}}
 
   :cljsbuild
@@ -63,8 +60,7 @@
                     :asset-path           "js/compiled/out"
                     :source-map-timestamp true
                     :preloads             [devtools.preload
-                                           day8.re-frame.trace.preload
-                                           re-frisk.preload]
+                                           day8.re-frame-10x.preload]
                     :closure-defines      {"re_frame.trace.trace_enabled_QMARK_" true}
                     :external-config      {:devtools/config {:features-to-install :all}}
                     }}
