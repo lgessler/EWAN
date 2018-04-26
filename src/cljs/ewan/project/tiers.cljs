@@ -27,6 +27,15 @@
        :eaf)))
 
 (rf/reg-sub
+ ::time-slot-val
+ (fn [db [_ id]]
+   (eaf30/get-time-slot-val
+    (-> db
+        :ewan.project.edit/current-project
+        :eaf)
+    id)))
+
+(rf/reg-sub
  ::tiers
  (fn [db]
    (-> db
@@ -35,11 +44,11 @@
        eaf30/get-tiers)))
 
 (defn- alignable-annotation
-  [a-ann pps eaf]
+  [a-ann pps]
   (let [ppms (/ pps 1000)
         {:keys [time-slot-ref1 time-slot-ref2] :as attrs} (second a-ann)
-        start (eaf30/get-time-slot-val @eaf time-slot-ref1)
-        end (eaf30/get-time-slot-val @eaf time-slot-ref2)
+        start @(rf/subscribe [::time-slot-val time-slot-ref1])
+        end @(rf/subscribe [::time-slot-val time-slot-ref2])
         x (* ppms start)
         width (* ppms (- end start))
         width (if (< x 0) 20 width)] ;; TODO: find out what it means for a time-slot to not have a val
@@ -51,27 +60,26 @@
      ]))
 
 (defn- annotation
-  [ann pps eaf]
+  [ann pps]
   (let [ann-type (-> ann (nth 2) first)]
     (condp = ann-type
-      :alignable-annotation [alignable-annotation (nth ann 2) pps eaf]
+      :alignable-annotation [alignable-annotation (nth ann 2) pps]
       nil)))
 
 (defn- tier-row
-  [tier duration pps eaf]
+  [tier duration pps]
   (let [w (* @duration @pps)]
     [:div.tier-rows__row
      [:svg {:width w :height "32"}
       (for [ann (drop 2 tier)]
-        ^{:key (-> ann (nth 2) second :annotation-id)} [annotation ann @pps eaf])]]))
+        ^{:key (-> ann (nth 2) second :annotation-id)} [annotation ann @pps])]]))
 
 (defn- tier-rows [tiers]
   (let [pps (rf/subscribe [::px-per-sec])
-        duration (rf/subscribe [::duration])
-        eaf (rf/subscribe [::eaf])]
+        duration (rf/subscribe [::duration])]
     [:div.tier-rows__container
      (for [tier @tiers]
-       ^{:key (-> tier second :tier-id)} [tier-row tier duration pps eaf])]))
+       ^{:key (-> tier second :tier-id)} [tier-row tier duration pps])]))
 
 (defn- tier-labels [tiers]
   [:div.tier-labels__container
