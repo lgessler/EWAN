@@ -1,4 +1,4 @@
-(ns ewan.project.edit.tiers
+(ns ewan.project.tiers
   (:require [re-frame.core :as rf]
             [ewan.spec.eaf30 :as eaf30]
             [cljsjs.material-ui]

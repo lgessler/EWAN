@@ -1,7 +1,7 @@
 (ns ewan.project.edit
   (:require [re-frame.core :as rf]
             [ewan.spec.eaf30 :as eaf30]
-            [ewan.project.edit.tiers :refer [tiers]]
+            [ewan.project.tiers :as tiers]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]
@@ -100,7 +100,7 @@
          file-maps (playable-media doc)]
      (-> db
          (merge default-db)
-         (merge ewan.project.edit.tiers/default-db)
+         (merge tiers/default-db)
          (assoc ::current-project doc)
          (update ::media into file-maps)
          (update ::playback merge (or (first (filter #(= (:type %) :video) file-maps))
@@ -262,7 +262,7 @@
     (if @loaded
       [:div
        [upper-panel]
-       [tiers]]
+       [tiers/tiers]]
       [:div.page-loading
        [ui/circular-progress {:size 80
                               :thickness 7}]])))
