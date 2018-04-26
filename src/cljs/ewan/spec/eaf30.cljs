@@ -552,6 +552,15 @@
         (recur (z/right zipper) pred)
         zipper))))
 
+(defn- left-while
+  "Call z/left while (pred (z/node zipper)) is true"
+  [zipper pred]
+  (when zipper
+    (when-let [node (z/node zipper)]
+      (if (pred node)
+        (recur (z/left zipper) pred)
+        zipper))))
+
 (defn- take-right-while
   "Returns a seq of contiguous nodes beginning from the current node and going
   right such that (pred node) is satisfied for all in the sequence"
@@ -592,13 +601,28 @@
 (def get-time-slot-val
   (memoize
    (fn [hiccup time-slot-id]
-     (when-let [elt (-> hiccup
-                        go-to-time-slots
-                        (right-while #(not= time-slot-id
-                                            (-> %
-                                                second
-                                                :time-slot-id))))]
-       (-> elt z/node second :time-value)))))
+     (when-let [zipper (-> hiccup
+                           go-to-time-slots
+                           (right-while #(not= time-slot-id
+                                               (-> %
+                                                   second
+                                                   :time-slot-id))))]
+       ;; TODO: find out why :time-value is sometimes allowed to be null
+       ;; for now, just interpolate between the two neighboring time slots
+       ;; with time-value values
+       (or (-> zipper z/node second :time-value)
+           (let [left-neighbor-val (or (-> zipper
+                                           (left-while #(not (some? (:time-value (second %)))))
+                                           z/node
+                                           second
+                                           :time-value)
+                                       0)
+                 right-neighbor-val (-> zipper
+                                        (right-while #(not (some? (:time-value (second %)))))
+                                        z/node
+                                        second
+                                        :time-value)]
+             (str (/ (+ (int left-neighbor-val) (int right-neighbor-val)) 2))))))))
 
 (defzipfn get-tiers
   z/down
