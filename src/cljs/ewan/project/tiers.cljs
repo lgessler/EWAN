@@ -24,20 +24,12 @@
             (fn [db] (get-in db [:ewan.project.edit/playback :duration])))
 
 (rf/reg-sub
- ::eaf
- (fn [db]
-   (-> db
-       :ewan.project.edit/current-project
-       :eaf)))
-
-(rf/reg-sub
- ::time-slot-val
- (fn [db [_ id]]
-   (eaf30/get-time-slot-val
-    (-> db
-        :ewan.project.edit/current-project
-        :eaf)
-    id)))
+ ::time-vals
+ (fn [db [_ ann]]
+   (eaf30/get-annotation-times (-> db
+                                   :ewan.project.edit/current-project
+                                   :eaf)
+                               (-> ann second :annotation-id))))
 
 (rf/reg-sub
  ::tiers
@@ -53,11 +45,9 @@
   ;; to refer to time-slots without a value
   (let [pps @(rf/subscribe [::px-per-sec])
         ppms (/ pps 1000)
-        {:keys [time-slot-ref1 time-slot-ref2] :as attrs} (second a-ann)
-        start @(rf/subscribe [::time-slot-val time-slot-ref1])
-        end @(rf/subscribe [::time-slot-val time-slot-ref2])
-        x (* ppms start)
-        width (* ppms (- end start))]
+        {:keys [time1 time2]} @(rf/subscribe [::time-vals a-ann])
+        x (* ppms time1)
+        width (* ppms (- time2 time1))]
     [:svg {:height TIER_HEIGHT :width width :x x :y 0}
      [:path {:stroke "black" :stroke-width 1
              :d (str "M 0.5 0 l 0 "
@@ -71,14 +61,16 @@
                      " 0 l 0 "
                      TIER_HEIGHT)}]
      [:text {:x 3 :y 14 :font-size 12}
-      (-> a-ann (nth 2) (nth 2))]
-     ]))
+      (-> a-ann (nth 2) (nth 2 nil))]]))
+
+(def ^:private ref-annotation alignable-annotation)
 
 (defn- annotation
   [ann]
   (let [ann-type (-> ann (nth 2) first)]
     (condp = ann-type
       :alignable-annotation [alignable-annotation (nth ann 2)]
+      :ref-annotation [ref-annotation (nth ann 2)]
       nil)))
 
 (defn- tier-row

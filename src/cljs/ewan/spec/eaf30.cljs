@@ -629,6 +629,34 @@
   (right-while #(not= (first %) :tier))
   (take-right-while #(= (first %) :tier)))
 
+(def build-annotation-map
+  (memoize
+   (fn [hiccup]
+     (into {}
+           (for [tier (get-tiers hiccup)
+                 ann (drop 2 tier)]
+             (let [ann (nth ann 2)
+                   type (first ann)
+                   {:keys [:annotation-id
+                           :annotation-ref
+                           :time-slot-ref1
+                           :time-slot-ref2]} (second ann)
+                    ;val (nth (nth ann 2) 2 nil)
+                   ]
+               [annotation-id
+                (if annotation-ref
+                  {:ref annotation-ref}
+                  {:time1 (get-time-slot-val hiccup time-slot-ref1)
+                   :time2 (get-time-slot-val hiccup time-slot-ref2)})]))))))
 
+(defn get-annotation-times
+  [hiccup ann-id]
+  (let [{:keys [ref] :as m}
+        (get (build-annotation-map hiccup) ann-id)]
+    (if ref
+      (recur hiccup ref)
+      m)))
 ;(def *eaf (:eaf (:ewan.project.edit/current-project re-frame.db.app-db.state)))
-;(def *zip (hiccup-zipper *eaf))
+
+;(into {} (get-annotation-map *eaf))
+;(get-tiers *eaf)
