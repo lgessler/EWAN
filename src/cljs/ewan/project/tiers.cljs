@@ -57,8 +57,7 @@
         start @(rf/subscribe [::time-slot-val time-slot-ref1])
         end @(rf/subscribe [::time-slot-val time-slot-ref2])
         x (* ppms start)
-        width (* ppms (- end start))
-        width (if (< x 0) 20 width)] 
+        width (* ppms (- end start))]
     [:svg {:height TIER_HEIGHT :width width :x x :y 0}
      [:path {:stroke "black" :stroke-width 1
              :d (str "M 0.5 0 l 0 "
@@ -94,6 +93,10 @@
 
 (defn- tier-rows [tiers]
     [:div.tier-rows__container
+     {:on-click #(ewan.project.edit/set-time!
+                  @(rf/subscribe [:ewan.project.edit/media-element])
+                  (-> % .-pageX (- 106) (/ @(rf/subscribe [::px-per-sec]))))}
+     ;; 106 = 100 (label width) + 6 (margin on the top-level paper element)
      (for [tier @tiers]
        ^{:key (-> tier second :tier-id)} [tier-row tier])])
 
@@ -108,6 +111,29 @@
         pps (rf/subscribe [::px-per-sec])]
     [:div.crosshair {:style {:left (str (+ 100 (* @pps @time)) "px")}}]))
 
+
+
+
+
+
+(defn- ticks []
+  (let [pps (rf/subscribe [::px-per-sec])
+        duration (rf/subscribe [::duration])]
+    [:div.ticks__container
+     [:div.ticks__spacer]
+     [:svg.ticks {:width (* @pps @duration)}
+      ;; use decisecs to avoid float precision issues
+      (for [decisec (range 0 (+ 10 (* @duration 10)))]
+        (let [sec (/ decisec 10)
+              x (* sec @pps)]
+          (if (= (mod decisec 10) 0)
+            [:g {:key decisec}
+             [:line {:x1 x :x2 x :y1 0 :y2 6 :stroke-width 0.5 :stroke "black"}]
+             [:text {:x x :y 16 :font-size 10 :text-anchor "middle"}
+              (ewan.project.edit/time-format sec)]]
+            [:line {:key decisec :x1 x :x2 x :y1 0 :y2 3 :stroke-width 0.5 :stroke "black"}]
+            )))]]))
+
 (defn tiers []
   (let [tiers (rf/subscribe [::tiers])
         rows (atom nil)]
@@ -117,8 +143,11 @@
        [:div {:style {:width "100%"
                       :position "relative"
                       :overflow-x "auto"
-                      :white-space "nowrap"}}
-        [tier-labels tiers]
-        [tier-rows tiers]
+                      :font-size 0}}
+        [ticks]
+        [:div {:style {:white-space "nowrap"
+                       :display "inline-block"}}
+         [tier-labels tiers]
+         [tier-rows tiers]]
         [crosshair]]])))
 

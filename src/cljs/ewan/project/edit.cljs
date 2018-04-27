@@ -131,7 +131,7 @@
 ;; These modify the media element's time directly, in keeping with our
 ;; convention that the ::playback map's :time value is only ever
 ;; set with on-time-update firing from the element.
-(defn- set-time!
+(defn set-time!
   [elt time]
   (when (and (= time :end) (not (.-paused elt)))
     (rf/dispatch-sync [::toggle-playback]))
@@ -140,7 +140,7 @@
           (.-duration elt)
           time)))
 
-(defn- add-time!
+(defn add-time!
   [elt time]
   (when (and (>= (+ time (.-currentTime elt)) (.-duration elt))
              (not (.-paused elt)))
@@ -191,13 +191,13 @@
     (str (int t))
     (str "0" (int t))))
 
-(defn- time-format
+(defn time-format
   [t]
   (let [hrs (zero-pad (/ t 3600))
         mins (zero-pad (/ (mod t 3600) 60))
         secs (zero-pad (mod t 60))
-        centisecs (zero-pad (* (mod t 1) 100))]
-    (str hrs ":" mins ":" secs "." centisecs)))
+        ms (zero-pad (* (mod t 1) 1000))]
+    (str hrs ":" mins ":" secs "." ms)))
 
 (defn- time-container [playback]
   [:div.media-panel__time-container

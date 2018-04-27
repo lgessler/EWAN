@@ -128,7 +128,6 @@ div.tier-labels__container {
     vertical-align: baseline;
     display: inline-block;
     background-color: white;
-    background-clip: content-box;
     z-index: 9001;
 }
 
@@ -165,4 +164,27 @@ div.crosshair {
     width: 1px;
     border-left: 1px solid red;
     height: 100%;
+}
+
+div.ticks__container {
+    white-space: nowrap;
+    display: inline-block;
+    position: relative;
+    height: 24px;
+}
+
+div.ticks__spacer {
+    width: 99px;
+    height: 24px;
+    position: sticky;
+    left: 0px;
+    z-index: 9001;
+    background-color: white;
+    vertical-align: baseline;
+    display: inline-block;
+    border-right: 1px solid @light-gray;
+}
+
+svg.ticks {
+    height: 24px;
 }
