@@ -80,33 +80,38 @@
         w (* @duration @pps)]
     [:div.tier-rows__row
      [:svg {:width w :height TIER_HEIGHT}
-      (for [ann (drop 2 tier)]
-        ^{:key (-> ann (nth 2) second :annotation-id)} [annotation ann])]]))
+      (doall
+       (for [ann (drop 2 tier)]
+         ^{:key (-> ann (nth 2) second :annotation-id)} [annotation ann]))]]))
+
+(defn- set-time!
+  [elt time]
+  (when (and (= time :end) (not (.-paused elt)))
+    (rf/dispatch-sync [:ewan.project.edit/toggle-playback]))
+  (set! (.-currentTime elt)
+        (if (= time :end)
+          (.-duration elt)
+          time)))
 
 (defn- tier-rows [tiers]
     [:div.tier-rows__container
-     {:on-click #(ewan.project.edit/set-time!
-                  @(rf/subscribe [:ewan.project.edit/media-element])
-                  (-> % .-pageX (- 106) (/ @(rf/subscribe [::px-per-sec]))))}
      ;; 106 = 100 (label width) + 6 (margin on the top-level paper element)
-     (for [tier @tiers]
-       ^{:key (-> tier second :tier-id)} [tier-row tier])])
+     (doall
+      (for [tier @tiers]
+        ^{:key (-> tier second :tier-id)} [tier-row tier]))])
 
 (defn- tier-labels [tiers]
   [:div.tier-labels__container
-   (for [tier @tiers]
-     (let [tier-id (-> tier second :tier-id)]
-       ^{:key tier-id} [:div.tier-labels__row tier-id]))])
+   {:on-click #(.stopPropagation %)}
+   (doall
+    (for [tier @tiers]
+      (let [tier-id (-> tier second :tier-id)]
+        ^{:key tier-id} [:div.tier-labels__row tier-id])))])
 
 (defn- crosshair []
   (let [time (rf/subscribe [::time])
         pps (rf/subscribe [::px-per-sec])]
     [:div.crosshair {:style {:left (str (+ 100 (* @pps @time)) "px")}}]))
-
-
-
-
-
 
 (defn- ticks []
   (let [pps (rf/subscribe [::px-per-sec])
@@ -115,16 +120,17 @@
      [:div.ticks__spacer]
      [:svg.ticks {:width (* @pps @duration)}
       ;; use decisecs to avoid float precision issues
-      (for [decisec (range 0 (+ 10 (* @duration 10)))]
-        (let [sec (/ decisec 10)
-              x (* sec @pps)]
-          (if (= (mod decisec 10) 0)
-            [:g {:key decisec}
-             [:line {:x1 x :x2 x :y1 0 :y2 6 :stroke-width 0.5 :stroke "black"}]
-             [:text {:x x :y 16 :font-size 10 :text-anchor "middle"}
-              (ewan.project.edit/time-format sec)]]
-            [:line {:key decisec :x1 x :x2 x :y1 0 :y2 3 :stroke-width 0.5 :stroke "black"}]
-            )))]]))
+      (doall
+       (for [decisec (range 0 (+ 10 (* @duration 10)))]
+         (let [sec (/ decisec 10)
+               x (* sec @pps)]
+           (if (= (mod decisec 10) 0)
+             [:g {:key decisec}
+              [:line {:x1 x :x2 x :y1 0 :y2 6 :stroke-width 0.5 :stroke "black"}]
+              [:text {:x x :y 16 :font-size 10 :text-anchor "middle" :style {:user-select "none"}}
+               (ewan.project.edit/time-format sec)]]
+             [:line {:key decisec :x1 x :x2 x :y1 0 :y2 3 :stroke-width 0.5 :stroke "black"}]
+             ))))]]))
 
 (defn tiers []
   (let [tiers (rf/subscribe [::tiers])
@@ -135,7 +141,13 @@
        [:div {:style {:width "100%"
                       :position "relative"
                       :overflow-x "auto"
-                      :font-size 0}}
+                      :font-size 0}
+              :on-click #(set-time!
+                          @(rf/subscribe [:ewan.project.edit/media-element])
+                          (/ (+ (-> % .-currentTarget .-scrollLeft)
+                                (.-pageX %)
+                                -106)
+                             @(rf/subscribe [::px-per-sec])))}
         [ticks]
         [:div {:style {:white-space "nowrap"
                        :display "inline-block"}}
