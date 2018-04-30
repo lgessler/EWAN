@@ -183,13 +183,13 @@
     [ui/raised-button {:label "New Project"
                        :label-position "after"
                        :primary true
-                       :icon (ic/content-add)
+                       ;:icon (ic/content-add)
                        :on-click open-new-project-dialog}]]
    [:li
     [ui/raised-button {:label "Upload ELAN file"
                        :label-position "after"
                        :primary false
-                       :icon (ic/file-file-upload)
+                       ;:icon [ic/file-file-upload]
                        :on-click open-upload-project-dialog}]]])
 
 
