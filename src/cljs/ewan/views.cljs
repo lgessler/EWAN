@@ -15,17 +15,17 @@
     [:div]))
 
 (rf/reg-sub
- ::active-panel
+ :active-panel
  (fn [db _]
    (:active-panel db)))
 
 (rf/reg-event-db
- ::set-active-panel
+ :set-active-panel
  (fn [db [_ active-panel]]
    (assoc db :active-panel active-panel)))
 
 (defn main-panel []
-  (r/with-let [active-panel (rf/subscribe [::active-panel])]
+  (r/with-let [active-panel (rf/subscribe [:active-panel])]
     [ui/mui-theme-provider
      {:mui-theme (get-mui-theme
                   (.-LightRawTheme js/MaterialUIStyles))}

@@ -1,51 +1,23 @@
-(ns ewan.project.tiers
+(ns ewan.project.edit.tiers
   (:require [re-frame.core :as rf]
-            [ewan.spec.eaf30 :as eaf30]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]
             [cljs-react-material-ui.icons :as ic]
+            [ewan.project.edit.state :as state]
             [reagent.core :as r]))
-
-(def default-db {::px-per-sec 150})
 
 ;; if you change these, be sure to change the LESS variable as well
 (def ^:private TIER_HEIGHT 32)
 (def ^:private HALF_TIER_HEIGHT 16)
 
-
-;; ----------------------------------------------------------------------------
-;; subs
-;; ----------------------------------------------------------------------------
-(rf/reg-sub ::px-per-sec (fn [db] (::px-per-sec db)))
-(rf/reg-sub ::time
-            (fn [db] (get-in db [:ewan.project.edit/playback :time])))
-(rf/reg-sub ::duration
-            (fn [db] (get-in db [:ewan.project.edit/playback :duration])))
-
-(rf/reg-sub
- ::time-vals
- (fn [db [_ ann]]
-   (eaf30/get-annotation-times (-> db
-                                   :ewan.project.edit/current-project
-                                   :eaf)
-                               (-> ann second :annotation-id))))
-
-(rf/reg-sub
- ::tiers
- (fn [db]
-   (-> db
-       :ewan.project.edit/current-project
-       :eaf
-       eaf30/get-tiers)))
-
 (defn- alignable-annotation
   [a-ann]
   ;; TODO: find out why time-slot-ref1 and ref2 are sometimes allowed
   ;; to refer to time-slots without a value
-  (let [pps @(rf/subscribe [::px-per-sec])
+  (let [pps @(rf/subscribe [:project/px-per-sec])
         ppms (/ pps 1000)
-        {:keys [time1 time2]} @(rf/subscribe [::time-vals a-ann])
+        {:keys [time1 time2]} @(rf/subscribe [:project/time-vals a-ann])
         x (* ppms time1)
         width (* ppms (- time2 time1))]
     [:svg {:height TIER_HEIGHT :width width :x x :y 0}
@@ -75,8 +47,8 @@
 
 (defn- tier-row
   [tier]
-  (let [duration (rf/subscribe [::duration])
-        pps (rf/subscribe [::px-per-sec])
+  (let [duration (rf/subscribe [:project/duration])
+        pps (rf/subscribe [:project/px-per-sec])
         w (* @duration @pps)]
     [:div.tier-rows__row
      [:svg {:width w :height TIER_HEIGHT}
@@ -109,13 +81,13 @@
         ^{:key tier-id} [:div.tier-labels__row tier-id])))])
 
 (defn- crosshair []
-  (let [time (rf/subscribe [::time])
-        pps (rf/subscribe [::px-per-sec])]
+  (let [time (rf/subscribe [:project/time])
+        pps (rf/subscribe [:project/px-per-sec])]
     [:div.crosshair {:style {:left (str (+ 100 (* @pps @time)) "px")}}]))
 
 (defn- ticks []
-  (let [pps (rf/subscribe [::px-per-sec])
-        duration (rf/subscribe [::duration])]
+  (let [pps (rf/subscribe [:project/px-per-sec])
+        duration (rf/subscribe [:project/duration])]
     [:div.ticks__container
      [:div.ticks__spacer]
      [:svg.ticks {:width (* @pps @duration)}
@@ -128,12 +100,12 @@
              [:g {:key decisec}
               [:line {:x1 x :x2 x :y1 0 :y2 6 :stroke-width 0.5 :stroke "black"}]
               [:text {:x x :y 16 :font-size 10 :text-anchor "middle" :style {:user-select "none"}}
-               (ewan.project.edit/time-format sec)]]
+               (state/time-format sec)]]
              [:line {:key decisec :x1 x :x2 x :y1 0 :y2 3 :stroke-width 0.5 :stroke "black"}]
              ))))]]))
 
 (defn tiers []
-  (let [tiers (rf/subscribe [::tiers])
+  (let [tiers (rf/subscribe [:project/tiers])
         rows (atom nil)]
     (fn []
       [ui/paper
@@ -143,11 +115,11 @@
                       :overflow-x "auto"
                       :font-size 0}
               :on-click #(set-time!
-                          @(rf/subscribe [:ewan.project.edit/media-element])
+                          @(rf/subscribe [:project/media-element])
                           (/ (+ (-> % .-currentTarget .-scrollLeft)
                                 (.-pageX %)
                                 -106)
-                             @(rf/subscribe [::px-per-sec])))}
+                             @(rf/subscribe [:project/px-per-sec])))}
         [ticks]
         [:div {:style {:white-space "nowrap"
                        :display "inline-block"}}

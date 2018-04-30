@@ -26,10 +26,10 @@
     (secretary/dispatch! "/project"))
 
   (defroute "/project" []
-    (re-frame/dispatch [:ewan.views/set-active-panel :project-select-panel]))
+    (re-frame/dispatch [:set-active-panel :project-select-panel]))
 
   (defroute "/project/:id" [id]
-    (re-frame/dispatch [:ewan.project.edit/open-project id]))
+    (re-frame/dispatch [:project/open-project id]))
 
 
   ;; --------------------
