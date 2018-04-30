@@ -6,7 +6,8 @@
             [clojure.string :as string]
             [clojure.zip :as z])
   (:require-macros [cljs.spec.alpha :as s]
-                   [ewan.spec.eaf30 :refer [defzipfn]]))
+                   [ewan.spec.eaf30 :refer [defzipfn
+                                            defzipfn-]]))
 
 ;; ----------------------------------------------------------------------------
 ;; Conversion functions
@@ -526,12 +527,11 @@
    [:constraint {:description "Time alignable annotations within the parent annotation's time interval, gaps are allowed"
                  :stereotype "Included_In"}]])
 
-
-;; Getters and setters
+;; helper funcs
 ;; ----------------------------------------------------------------------------
 ;; Internally, we will use clojure.zip, as it's probably the most ergonomic way
-;; of manipulating this rather large hiccup structure.
-
+;; of manipulating this rather large hiccup structure. The public API for this
+;; module, however, will never expose a zipper to consumers.
 (defn- hiccup-zipper
   "Returns a zipper for Hiccup forms, given a root form."
   [root]
@@ -542,50 +542,94 @@
      #(into [] (concat (take (children-pos %1) %1) %2)) ; make new node
      root)))
 
-;; helper funcs
 (defn- right-while
   "Call z/right while (pred (z/node zipper)) is true"
-  [zipper pred]
-  (when zipper
-    (when-let [node (z/node zipper)]
+  [loc pred]
+  (when loc
+    (when-let [node (z/node loc)]
       (if (pred node)
-        (recur (z/right zipper) pred)
-        zipper))))
+        (recur (z/right loc) pred)
+        loc))))
 
 (defn- left-while
-  "Call z/left while (pred (z/node zipper)) is true"
-  [zipper pred]
-  (when zipper
-    (when-let [node (z/node zipper)]
+  "Call z/left while (pred (z/node loc)) is true"
+  [loc pred]
+  (when loc
+    (when-let [node (z/node loc)]
       (if (pred node)
-        (recur (z/left zipper) pred)
-        zipper))))
+        (recur (z/left loc) pred)
+        loc))))
 
 (defn- take-right-while
   "Returns a seq of contiguous nodes beginning from the current node and going
   right such that (pred node) is satisfied for all in the sequence"
-  [zipper pred]
-  (when zipper
-    (when-let [node (z/node zipper)]
+  [loc pred]
+  (when loc
+    (when-let [node (z/node loc)]
       (when (pred node)
-        (cons node (take-right-while (z/right zipper) pred))))))
+        (cons node (take-right-while (z/right loc) pred))))))
 
 (defn- update-right-while
   "Like right-while, but also updates each node that tests true with
-  the value of (func (z/node zipper))"
-  [zipper pred func]
-  (when zipper
-    (when-let [node (z/node zipper)]
+  the value of (func (z/node loc))"
+  [loc pred func]
+  (when loc
+    (when-let [node (z/node loc)]
       (if (pred node)
-        (recur (z/right (z/replace zipper (func node))) pred func)
-        zipper))))
+        (recur (z/right (z/replace loc (func node))) pred func)
+        loc))))
 
+(defn- right-to-first
+  [loc kwd]
+  (right-while loc #(not= (first %) kwd)))
+
+;; for hiccup
+(defn- attrs
+  [hiccup]
+  (and (map? (second hiccup))
+       (second hiccup)))
+
+(defn- children
+  [hiccup]
+  (if-not (map? (second hiccup))
+    (js/Error. "EAF hiccup must have an attrs map, even if it is empty.")
+    (drop 2 hiccup)))
+
+;; Getters and setters
+;; ----------------------------------------------------------------------------
+
+(def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
 
 ;; defzipfn is a macro that generates something like this:
 ;; (defn <name> [hiccup] (-> hiccup hiccup-zipper <arg1> <arg2> ...))
+;; Functions prefixed with `go-to` return a `zip` location, or `nil` if no
+;; appropriate element could be found
+(defzipfn- go-to-annotation-document) ;; do nothing
+(defzipfn- go-to-licenses z/down (right-to-first :license))
+(defzipfn- go-to-header z/down (right-to-first :header))
+(defzipfn- go-to-time-order z/down (right-to-first :time-order))
+(defzipfn- go-to-tiers z/down (right-to-first :tier))
+(defzipfn- go-to-linguistic-types z/down (right-to-first :linguistic-type))
+(defzipfn- go-to-locales z/down (right-to-first :locale))
+(defzipfn- go-to-languages z/down (right-to-first :language))
+(defzipfn- go-to-constraints z/down (right-to-first :constraint))
+(defzipfn- go-to-controlled-vocabularies z/down (right-to-first :controlled-vocabulary))
+(defzipfn- go-to-lexicon-refs z/down (right-to-first :lexicon-ref))
+(defzipfn- go-to-external-refs z/down (right-to-first :external-ref))
+
+;; public annotation-document methods
 (defzipfn get-date z/node second :date)
 (defzipfn get-author z/node second :author)
 (defzipfn get-version z/node second :version)
+
+(defmulti foo first)
+(defmethod foo :annotation-document [_] (js/alert "Foo!"))
+(defmethod foo :default [_] (js/alert "Didn't recognize that."))
+
+;; public license methods
+;;TODO
+
+;; public header
 (defzipfn get-media-descriptors
   z/down
   z/down
@@ -656,7 +700,7 @@
     (if ref
       (recur hiccup ref)
       m)))
-;(def *eaf (:eaf (:ewan.project.edit/current-project re-frame.db.app-db.state)))
+
 
 ;(into {} (get-annotation-map *eaf))
 ;(get-tiers *eaf)

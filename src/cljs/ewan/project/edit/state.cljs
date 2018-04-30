@@ -1,16 +1,14 @@
 (ns ewan.project.edit.state
   (:require [re-frame.core :as rf]
-            [ewan.spec.eaf30 :as eaf30]))
+            [ewan.spec.eaf30 :as eaf30]
+            [cljs.spec.alpha :as s]))
 
-;;
 ;; project/playback
 ;;     type, src, play, duration, media-element
 ;; project/media
 ;; project/loaded
 ;; project/px-per-sec
 ;; project/current-project
-
-
 
 (def ^:private default-db {:project/playback {}
                            :project/media (list)
@@ -94,7 +92,8 @@
               {:type (if (video-file? file) :video :audio)
                :src (.createObjectURL js/URL (:data file))
                :play false
-               :duration 0}))))
+               :duration 0
+               :media-element nil}))))
 
 (defn- rekeywordize
   "clj->js destroys keyword information, but luckily we can recover it because
