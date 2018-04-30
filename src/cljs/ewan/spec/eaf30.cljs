@@ -532,6 +532,23 @@
 ;; Internally, we will use clojure.zip, as it's probably the most ergonomic way
 ;; of manipulating this rather large hiccup structure. The public API for this
 ;; module, however, will never expose a zipper to consumers.
+
+;; for hiccup
+(defn- tag-name
+  [hiccup]
+  (first hiccup))
+
+(defn- attrs
+  [hiccup]
+  (and (map? (second hiccup))
+       (second hiccup)))
+
+(defn- children
+  [hiccup]
+  (if-not (map? (second hiccup))
+    (js/Error. "EAF hiccup must have an attrs map, even if it is empty.")
+    (drop 2 hiccup)))
+
 (defn- hiccup-zipper
   "Returns a zipper for Hiccup forms, given a root form."
   [root]
@@ -581,19 +598,11 @@
 
 (defn- right-to-first
   [loc kwd]
-  (right-while loc #(not= (first %) kwd)))
+  (right-while loc #(not= (tag-name %) kwd)))
 
-;; for hiccup
-(defn- attrs
-  [hiccup]
-  (and (map? (second hiccup))
-       (second hiccup)))
-
-(defn- children
-  [hiccup]
-  (if-not (map? (second hiccup))
-    (js/Error. "EAF hiccup must have an attrs map, even if it is empty.")
-    (drop 2 hiccup)))
+(defn- take-right-to-last
+  [loc kwd]
+  (take-right-while loc #(= (tag-name %) kwd)))
 
 ;; Getters and setters
 ;; ----------------------------------------------------------------------------
@@ -618,73 +627,84 @@
 (defzipfn- go-to-external-refs z/down (right-to-first :external-ref))
 
 ;; public annotation-document methods
-(defzipfn get-date z/node second :date)
-(defzipfn get-author z/node second :author)
-(defzipfn get-version z/node second :version)
-
-(defmulti foo first)
-(defmethod foo :annotation-document [_] (js/alert "Foo!"))
-(defmethod foo :default [_] (js/alert "Didn't recognize that."))
+(defzipfn get-date z/node attrs :date)
+(defzipfn get-author z/node attrs :author)
+(defzipfn get-version z/node attrs :version)
 
 ;; public license methods
-;;TODO
+(defn get-licenses
+  [hiccup]
+  (-> hiccup
+      go-to-licenses
+      (take-right-to-last :license)))
 
-;; public header
-(defzipfn get-media-descriptors
-  z/down
-  z/down
-  (take-right-while #(= (first %) :media-descriptor)))
+(defn get-media-descriptors
+  [hiccup]
+  (-> hiccup
+      go-to-header
+      z/down
+      (take-right-to-last :media-descriptor)))
 
-(defzipfn go-to-time-slots
-  z/down
-  z/right
-  z/down)
+(defn get-properties
+  [hiccup]
+  (-> hiccup
+      go-to-header
+      z/down
+      (right-to-first :property)
+      (take-right-to-last :property)))
+
+(defn get-tiers
+  [hiccup]
+  (-> hiccup
+      go-to-tiers
+      (take-right-to-last :tier)))
+
+;; NYI: get-* for linguistic types, locales, languages, etc.
 
 ;; should this really be memoized? seems like it, but think about it
-;; memoization must happen at the :annotation-document level 
+;; memoization must happen at the :annotation-document level
 (def get-time-slot-val
-  (memoize
-   (fn [hiccup time-slot-id]
-     (when-let [zipper (-> hiccup
-                           go-to-time-slots
-                           (right-while #(not= time-slot-id
-                                               (-> %
-                                                   second
-                                                   :time-slot-id))))]
-       ;; TODO: find out why :time-value is sometimes allowed to be null
-       ;; for now, just interpolate between the two neighboring time slots
-       ;; with time-value values
-       (or (-> zipper z/node second :time-value)
-           (let [left-neighbor-val (or (-> zipper
-                                           (left-while #(not (some? (:time-value (second %)))))
-                                           z/node
-                                           second
-                                           :time-value)
-                                       0)
-                 right-neighbor-val (-> zipper
-                                        (right-while #(not (some? (:time-value (second %)))))
-                                        z/node
-                                        second
-                                        :time-value)]
-             (str (/ (+ (int left-neighbor-val) (int right-neighbor-val)) 2))))))))
+                                        ;(memoize
+  (fn [hiccup time-slot-id]
+    (when-let [loc (-> hiccup
+                       go-to-time-order
+                       z/down
+                       (right-while
+                        #(not= time-slot-id (:time-slot-id (attrs %)))))]
+      ;; TODO: find out why :time-value is sometimes allowed to be null
+      ;; for now, just interpolate between the two neighboring time slots
+      ;; with time-value values
+      (or (-> loc z/node attrs :time-value)
+          (let [left-neighbor-val
+                (or (-> loc
+                        (left-while #(not (some? (:time-value (attrs %)))))
+                        z/node
+                        attrs
+                        :time-value)
+                    0)
+                right-neighbor-val
+                (-> loc
+                    (right-while #(not (some? (:time-value (attrs %)))))
+                    z/node
+                    attrs
+                    :time-value)]
+            (str (/ (+ (int left-neighbor-val)
+                       (int right-neighbor-val))
+                    2)))))))
 
-(defzipfn get-tiers
-  z/down
-  (right-while #(not= (first %) :tier))
-  (take-right-while #(= (first %) :tier)))
 
-(def build-annotation-map
+(def ^:private build-annotation-map
   (memoize
    (fn [hiccup]
      (into {}
            (for [tier (get-tiers hiccup)
-                 ann (drop 2 tier)]
-             (let [ann (nth ann 2)
-                   type (first ann)
+                 ann (children tier)]
+             (let [inner-ann (first (children ann))
+                   type (tag-name inner-ann)
                    {:keys [:annotation-id
                            :annotation-ref
                            :time-slot-ref1
-                           :time-slot-ref2]} (second ann)
+                           :time-slot-ref2]} (attrs inner-ann)
                     ;val (nth (nth ann 2) 2 nil)
                    ]
                [annotation-id
@@ -700,7 +720,3 @@
     (if ref
       (recur hiccup ref)
       m)))
-
-
-;(into {} (get-annotation-map *eaf))
-;(get-tiers *eaf)
