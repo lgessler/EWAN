@@ -13,7 +13,8 @@
 (def ^:private default-db {:project/playback {}
                            :project/media (list)
                            :project/loaded false
-                           :project/px-per-sec 150})
+                           :project/px-per-sec 150
+                           :project/scroll-left 0})
 
 
 ;; helpers
@@ -140,6 +141,11 @@
  (fn [db [_ elt]]
    (assoc-in db [:project/playback :media-element] elt)))
 
+(rf/reg-event-db
+ :project/set-scroll-left
+ (fn [db [_ v]]
+   (assoc db :project/scroll-left v)))
+
 ;; These modify the media element's time directly, in keeping with our
 ;; convention that the :project/playback map's :time value is only ever
 ;; set with on-time-update firing from the element.
@@ -199,6 +205,12 @@
  (fn [db]
    (get-in db [:project/playback :duration])))
 
+
+(rf/reg-sub
+ :project/scroll-left
+ (fn [db]
+   (:project/scroll-left db)))
+
 (rf/reg-sub
  :project/time-vals
  (fn [db [_ ann]]
@@ -214,7 +226,6 @@
        :project/current-project
        :eaf
        eaf30/get-tiers)))
-
 
 
 

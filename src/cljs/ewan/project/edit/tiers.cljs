@@ -5,7 +5,8 @@
             [cljs-react-material-ui.reagent :as ui]
             [cljs-react-material-ui.icons :as ic]
             [ewan.project.edit.state :as state]
-            [reagent.core :as r]))
+            [reagent.core :as r]
+            [goog.functions]))
 
 ;; if you change these, be sure to change the LESS variable as well
 (def ^:private TIER_HEIGHT 32)
@@ -56,15 +57,6 @@
        (for [ann (drop 2 tier)]
          ^{:key (-> ann (nth 2) second :annotation-id)} [annotation ann]))]]))
 
-(defn- set-time!
-  [elt time]
-  (when (and (= time :end) (not (.-paused elt)))
-    (rf/dispatch-sync [:ewan.project.edit/toggle-playback]))
-  (set! (.-currentTime elt)
-        (if (= time :end)
-          (.-duration elt)
-          time)))
-
 (defn- tier-rows [tiers]
     [:div.tier-rows__container
      ;; 106 = 100 (label width) + 6 (margin on the top-level paper element)
@@ -104,26 +96,50 @@
              [:line {:key decisec :x1 x :x2 x :y1 0 :y2 3 :stroke-width 0.5 :stroke "black"}]
              ))))]]))
 
-(defn tiers []
-  (let [tiers (rf/subscribe [:project/tiers])
-        rows (atom nil)]
-    (fn []
-      [ui/paper
-       {:style {:margin "6px"}}
-       [:div {:style {:width "100%"
-                      :position "relative"
-                      :overflow-x "auto"
-                      :font-size 0}
-              :on-click #(set-time!
-                          @(rf/subscribe [:project/media-element])
-                          (/ (+ (-> % .-currentTarget .-scrollLeft)
-                                (.-pageX %)
-                                -106)
-                             @(rf/subscribe [:project/px-per-sec])))}
-        [ticks]
-        [:div {:style {:white-space "nowrap"
-                       :display "inline-block"}}
-         [tier-labels tiers]
-         [tier-rows tiers]]
-        [crosshair]]])))
+(defn- tiers-inner
+  []
+  (r/with-let [tiers (rf/subscribe [:project/tiers])
+               !div (atom nil)
+               handle-scroll
+               (goog.functions.debounce
+                #(rf/dispatch-sync [:project/set-scroll-left
+                               (-> % .-target .-scrollLeft)])
+                100)
+               on-scroll
+               (fn [e]
+                 (.persist e)
+                 (handle-scroll e))
+               update (fn [comp]
+                        (let [{:keys [scroll-left]} (r/props comp)]
+                          (when (not= (.-scrollLeft @!div) scroll-left)
+                            (set! (.-scrollLeft @!div) scroll-left))))]
+    (r/create-class
+     {:component-did-update
+      update
+      :reagent-render
+      (fn []
+        [ui/paper
+         {:style {:margin "6px"}}
+         [:div {:style {:width "100%"
+                        :position "relative"
+                        :overflow-x "auto"
+                        :font-size 0}
+                :ref #(reset! !div %)
+                :on-scroll on-scroll
+                :on-click #(state/set-time!
+                            @(rf/subscribe [:project/media-element])
+                            (/ (+ (-> % .-currentTarget .-scrollLeft)
+                                  (.-pageX %)
+                                  -106)
+                               @(rf/subscribe [:project/px-per-sec])))}
+          [ticks]
+          [:div {:style {:white-space "nowrap"
+                         :display "inline-block"}}
+           [tier-labels tiers]
+           [tier-rows tiers]]
+          [crosshair]]])})))
 
+(defn tiers []
+  (let [scroll-left (rf/subscribe [:project/scroll-left])]
+    (fn []
+      [tiers-inner {:scroll-left @scroll-left}])))
