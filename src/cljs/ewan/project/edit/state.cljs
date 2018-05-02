@@ -1,5 +1,6 @@
 (ns ewan.project.edit.state
   (:require [re-frame.core :as rf]
+            [ewan.common :refer [simple-sub]]
             [ewan.spec.eaf30 :as eaf30]
             [cljs.spec.alpha :as s]))
 
@@ -15,6 +16,10 @@
                            :project/loaded false
                            :project/px-per-sec 150
                            :project/scroll-left 0})
+
+;; if you change these, be sure to change the LESS variable as well
+(def ^:private TIER_HEIGHT 32)
+(def ^:private HALF_TIER_HEIGHT 16)
 
 
 ;; helpers
@@ -171,45 +176,14 @@
 ;; ----------------------------------------------------------------------------
 ;; subs
 ;; ----------------------------------------------------------------------------
-(rf/reg-sub
- :project/loaded
- (fn [db _]
-   (:project/loaded db)))
-
-(rf/reg-sub
- :project/current-project
- (fn [db _]
-   (:project/current-project db)))
-
-(rf/reg-sub
- :project/playback
- (fn [db _] (:project/playback db)))
-
-(rf/reg-sub
- :project/media-element
- (fn [db _]
-   (:media-element (:project/playback db))))
-
-(rf/reg-sub
- :project/px-per-sec
- (fn [db]
-   (:project/px-per-sec db)))
-
-(rf/reg-sub
- :project/time
- (fn [db]
-   (get-in db [:project/playback :time])))
-
-(rf/reg-sub
- :project/duration
- (fn [db]
-   (get-in db [:project/playback :duration])))
-
-
-(rf/reg-sub
- :project/scroll-left
- (fn [db]
-   (:project/scroll-left db)))
+(simple-sub :project/loaded)
+(simple-sub :project/current-project)
+(simple-sub :project/playback)
+(simple-sub :project/px-per-sec)
+(simple-sub :project/scroll-left)
+(simple-sub :project/media-element [:project/playback :media-element])
+(simple-sub :project/time [:project/playback :time])
+(simple-sub :project/duration [:project/playback :duration])
 
 (rf/reg-sub
  :project/time-vals
@@ -220,12 +194,55 @@
                                (-> ann second :annotation-id))))
 
 (rf/reg-sub
+ :project/ann-display-info
+ (fn [db [_ ann]]
+   (let [pps (:project/px-per-sec db)
+         ppms (/ pps 1000)
+         {:keys [time1 time2]} (eaf30/get-annotation-times
+                                (-> db
+                                    :project/current-project
+                                    :eaf)
+                                (-> ann second :annotation-id))
+         width (* ppms (- time2 time1))]
+     {:height TIER_HEIGHT
+      :x (* ppms time1)
+      :width width
+      :d (str "M 0.5 0 l 0 "
+              TIER_HEIGHT
+              " M 0.5 "
+              HALF_TIER_HEIGHT
+              " l "
+              (- width 1)
+              " 0 M "
+              (- width 0.5)
+              " 0 l 0 "
+              TIER_HEIGHT)
+      :text (-> ann (nth 2) (nth 2 nil))})))
+
+(rf/reg-sub
+ :project/tier-width
+ :<- [:project/duration]
+ :<- [:project/px-per-sec]
+ (fn [[duration pps] _]
+   (* duration pps)))
+
+(rf/reg-sub
+ :project/tier-height
+ (fn [_ _]
+   TIER_HEIGHT))
+
+(rf/reg-sub
  :project/tiers
  (fn [db]
    (-> db
        :project/current-project
        :eaf
        eaf30/get-tiers)))
+
+(rf/reg-sub
+ :project/crosshair-display-info
+ (fn [db]
+   {}))
 
 
 

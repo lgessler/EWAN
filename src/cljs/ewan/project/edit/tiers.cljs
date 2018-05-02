@@ -4,73 +4,57 @@
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]
             [cljs-react-material-ui.icons :as ic]
+            [ewan.common :refer [tag-name attrs first-child children]]
             [ewan.project.edit.state :as state]
             [reagent.core :as r]
             [goog.functions]))
-
-;; if you change these, be sure to change the LESS variable as well
-(def ^:private TIER_HEIGHT 32)
-(def ^:private HALF_TIER_HEIGHT 16)
 
 (defn- alignable-annotation
   [a-ann]
   ;; TODO: find out why time-slot-ref1 and ref2 are sometimes allowed
   ;; to refer to time-slots without a value
-  (let [pps @(rf/subscribe [:project/px-per-sec])
-        ppms (/ pps 1000)
-        {:keys [time1 time2]} @(rf/subscribe [:project/time-vals a-ann])
-        x (* ppms time1)
-        width (* ppms (- time2 time1))]
-    [:svg {:height TIER_HEIGHT :width width :x x :y 0}
-     [:path {:stroke "black" :stroke-width 1
-             :d (str "M 0.5 0 l 0 "
-                     TIER_HEIGHT
-                     " M 0.5 "
-                     HALF_TIER_HEIGHT
-                     " l "
-                     (- width 1)
-                     " 0 M "
-                     (- width 0.5)
-                     " 0 l 0 "
-                     TIER_HEIGHT)}]
+  (let [{:keys [height x width d text]} @(rf/subscribe [:project/ann-display-info a-ann])]
+    [:svg {:height height :width width :x x :y 0}
+     [:path {:stroke "black" :stroke-width 1 :d d}]
      [:text {:x 3 :y 14 :font-size 12}
-      (-> a-ann (nth 2) (nth 2 nil))]]))
+      text]]))
 
 (def ^:private ref-annotation alignable-annotation)
 
 (defn- annotation
   [ann]
-  (let [ann-type (-> ann (nth 2) first)]
+  (let [inner-ann (-> ann first-child)
+        ann-type (tag-name inner-ann)]
     (condp = ann-type
-      :alignable-annotation [alignable-annotation (nth ann 2)]
-      :ref-annotation [ref-annotation (nth ann 2)]
+      :alignable-annotation [alignable-annotation inner-ann]
+      :ref-annotation [ref-annotation inner-ann]
       nil)))
 
 (defn- tier-row
   [tier]
-  (let [duration (rf/subscribe [:project/duration])
-        pps (rf/subscribe [:project/px-per-sec])
-        w (* @duration @pps)]
-    [:div.tier-rows__row
-     [:svg {:width w :height TIER_HEIGHT}
-      (doall
-       (for [ann (drop 2 tier)]
-         ^{:key (-> ann (nth 2) second :annotation-id)} [annotation ann]))]]))
+  [:div.tier-rows__row
+   [:svg {:width @(rf/subscribe [:project/tier-width])
+          :height @(rf/subscribe [:project/tier-height])}
+    (doall
+     (for [ann (children tier)]
+       ^{:key (-> ann first-child attrs :annotation-id)}
+       [annotation ann]))]])
 
 (defn- tier-rows [tiers]
     [:div.tier-rows__container
-     ;; 106 = 100 (label width) + 6 (margin on the top-level paper element)
      (doall
       (for [tier @tiers]
-        ^{:key (-> tier second :tier-id)} [tier-row tier]))])
+        ^{:key (-> tier attrs :tier-id)}
+        [tier-row tier]))])
 
 (defn- tier-labels [tiers]
   [:div.tier-labels__container
    {:on-click #(.stopPropagation %)}
    (doall
     (for [tier @tiers]
-      (let [tier-id (-> tier second :tier-id)]
-        ^{:key tier-id} [:div.tier-labels__row tier-id])))])
+      (let [tier-id (-> tier attrs :tier-id)]
+        ^{:key tier-id}
+        [:div.tier-labels__row tier-id])))])
 
 (defn- crosshair []
   (let [time (rf/subscribe [:project/time])
@@ -93,8 +77,7 @@
               [:line {:x1 x :x2 x :y1 0 :y2 6 :stroke-width 0.5 :stroke "black"}]
               [:text {:x x :y 16 :font-size 10 :text-anchor "middle" :style {:user-select "none"}}
                (state/time-format sec)]]
-             [:line {:key decisec :x1 x :x2 x :y1 0 :y2 3 :stroke-width 0.5 :stroke "black"}]
-             ))))]]))
+             [:line {:key decisec :x1 x :x2 x :y1 0 :y2 3 :stroke-width 0.5 :stroke "black"}]))))]]))
 
 (defn- tiers-inner
   []
