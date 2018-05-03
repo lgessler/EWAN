@@ -607,7 +607,7 @@
 ;; Getters and setters
 ;; ----------------------------------------------------------------------------
 
-(def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
+#_(def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
 
 ;; defzipfn is a macro that generates something like this:
 ;; (defn <name> [hiccup] (-> hiccup hiccup-zipper <arg1> <arg2> ...))

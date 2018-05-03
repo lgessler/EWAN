@@ -184,41 +184,75 @@
 (simple-sub :project/media-element [:project/playback :media-element])
 (simple-sub :project/time [:project/playback :time])
 (simple-sub :project/duration [:project/playback :duration])
+(simple-sub :project/current-eaf [:project/current-project :eaf])
 
 (rf/reg-sub
- :project/time-vals
- (fn [db [_ ann]]
-   (eaf30/get-annotation-times (-> db
-                                   :project/current-project
-                                   :eaf)
-                               (-> ann second :annotation-id))))
+ :project/px-per-ms
+ :<- [:project/px-per-sec]
+ (fn [pps _]
+   (/ pps 1000)))
+
+;; individual annotation subs
+;; ----------------------------------------------------------------------------
+(rf/reg-sub
+ :project/ann-times
+ :<- [:project/current-eaf]
+ (fn [eaf [_ [_ {:keys [annotation-id]}]]]
+   (eaf30/get-annotation-times eaf annotation-id)))
 
 (rf/reg-sub
- :project/ann-display-info
- (fn [db [_ ann]]
-   (let [pps (:project/px-per-sec db)
-         ppms (/ pps 1000)
-         {:keys [time1 time2]} (eaf30/get-annotation-times
-                                (-> db
-                                    :project/current-project
-                                    :eaf)
-                                (-> ann second :annotation-id))
-         width (* ppms (- time2 time1))]
-     {:height TIER_HEIGHT
-      :x (* ppms time1)
-      :width width
-      :d (str "M 0.5 0 l 0 "
-              TIER_HEIGHT
-              " M 0.5 "
-              HALF_TIER_HEIGHT
-              " l "
-              (- width 1)
-              " 0 M "
-              (- width 0.5)
-              " 0 l 0 "
-              TIER_HEIGHT)
-      :text (-> ann (nth 2) (nth 2 nil))})))
+ :project/ann-width
+ (fn [[_ ann] _]
+   [(rf/subscribe [:project/px-per-ms])
+    (rf/subscribe [:project/ann-times ann])])
+ (fn [[ppms {:keys [time1 time2]}] [_ [_ {:keys [annotation-id]}]]]
+   (* ppms (- time2 time1))))
 
+(rf/reg-sub
+ :project/ann-svg-attrs
+ (fn [[_ ann] _]
+   [(rf/subscribe [:project/px-per-ms])
+    (rf/subscribe [:project/ann-times ann])
+    (rf/subscribe [:project/ann-width ann])])
+ (fn [[ppms {:keys [time1]} width] _]
+   {:height TIER_HEIGHT
+    :width width
+    :x (* ppms time1)
+    :y 0}))
+
+(rf/reg-sub
+ :project/ann-path-attrs
+ (fn [[_ ann] _]
+   (rf/subscribe [:project/ann-width ann]))
+ (fn [width _]
+   {:stroke "black"
+    :stroke-width 1
+    :d (str "M 0.5 0 l 0 "
+            TIER_HEIGHT
+            " M 0.5 "
+            HALF_TIER_HEIGHT
+            " l "
+            (- width 1)
+            " 0 M "
+            (- width 0.5)
+            " 0 l 0 "
+            TIER_HEIGHT)}))
+
+(rf/reg-sub
+ :project/ann-text-attrs
+ (fn [db]
+   {:x 3
+    :y (- HALF_TIER_HEIGHT 2)
+    :font-size (- HALF_TIER_HEIGHT 4)
+    :style {:user-select "none"}}))
+
+(rf/reg-sub
+ :project/ann-text-value
+ (fn [db [_ ann]]
+   (-> ann (nth 2) (nth 2 nil))))
+
+;; tier subs
+;; ----------------------------------------------------------------------------
 (rf/reg-sub
  :project/tier-width
  :<- [:project/duration]
@@ -241,8 +275,13 @@
 
 (rf/reg-sub
  :project/crosshair-display-info
- (fn [db]
-   {}))
+ :<- [:project/time]
+ :<- [:project/px-per-sec]
+ (fn [[time pps] _]
+   {:left (* pps time)}))
+
+
+
 
 
 

@@ -4,7 +4,8 @@
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]
             [cljs-react-material-ui.icons :as ic]
-            [ewan.common :refer [tag-name attrs first-child children]]
+            [ewan.common :refer [tag-name attrs first-child children
+                                 <sub >evt]]
             [ewan.project.edit.state :as state]
             [reagent.core :as r]
             [goog.functions]))
@@ -13,30 +14,29 @@
   [a-ann]
   ;; TODO: find out why time-slot-ref1 and ref2 are sometimes allowed
   ;; to refer to time-slots without a value
-  (let [{:keys [height x width d text]} @(rf/subscribe [:project/ann-display-info a-ann])]
-    [:svg {:height height :width width :x x :y 0}
-     [:path {:stroke "black" :stroke-width 1 :d d}]
-     [:text {:x 3 :y 14 :font-size 12}
-      text]]))
+  [:svg (merge (<sub [:project/ann-svg-attrs a-ann])
+               {:on-click #(js/alert "hi")
+                :style {:pointer-events "bounding-box"}})
+   [:path (<sub [:project/ann-path-attrs a-ann])]
+   [:text (<sub [:project/ann-text-attrs])
+    (<sub [:project/ann-text-value a-ann])]])
 
 (def ^:private ref-annotation alignable-annotation)
 
 (defn- annotation
-  [ann]
-  (let [inner-ann (-> ann first-child)
-        ann-type (tag-name inner-ann)]
-    (condp = ann-type
-      :alignable-annotation [alignable-annotation inner-ann]
-      :ref-annotation [ref-annotation inner-ann]
-      nil)))
+  [[_ _ [ann-type _ _ :as inner-ann]]]
+  (condp = ann-type
+    :alignable-annotation [alignable-annotation inner-ann]
+    :ref-annotation [ref-annotation inner-ann]
+    nil))
 
 (defn- tier-row
-  [tier]
+  [[_ _ & annotations]]
   [:div.tier-rows__row
-   [:svg {:width @(rf/subscribe [:project/tier-width])
-          :height @(rf/subscribe [:project/tier-height])}
+   [:svg {:width (<sub [:project/tier-width])
+          :height (<sub [:project/tier-height])}
     (doall
-     (for [ann (children tier)]
+     (for [ann annotations]
        ^{:key (-> ann first-child attrs :annotation-id)}
        [annotation ann]))]])
 
@@ -57,9 +57,8 @@
         [:div.tier-labels__row tier-id])))])
 
 (defn- crosshair []
-  (let [time (rf/subscribe [:project/time])
-        pps (rf/subscribe [:project/px-per-sec])]
-    [:div.crosshair {:style {:left (str (+ 100 (* @pps @time)) "px")}}]))
+  (let [{:keys [left]} (<sub [:project/crosshair-display-info])]
+    [:div.crosshair {:style {:left (str (+ 100 left) "px")}}]))
 
 (defn- ticks []
   (let [pps (rf/subscribe [:project/px-per-sec])
@@ -85,17 +84,18 @@
                !div (atom nil)
                handle-scroll
                (goog.functions.debounce
-                #(rf/dispatch-sync [:project/set-scroll-left
-                               (-> % .-target .-scrollLeft)])
+                #(>evt [:project/set-scroll-left
+                         (-> % .-target .-scrollLeft)])
                 100)
                on-scroll
                (fn [e]
                  (.persist e)
                  (handle-scroll e))
-               update (fn [comp]
-                        (let [{:keys [scroll-left]} (r/props comp)]
-                          (when (not= (.-scrollLeft @!div) scroll-left)
-                            (set! (.-scrollLeft @!div) scroll-left))))]
+               update
+               (fn [comp]
+                 (let [{:keys [scroll-left]} (r/props comp)]
+                   (when (not= (.-scrollLeft @!div) scroll-left)
+                     (set! (.-scrollLeft @!div) scroll-left))))]
     (r/create-class
      {:component-did-update
       update
@@ -110,11 +110,11 @@
                 :ref #(reset! !div %)
                 :on-scroll on-scroll
                 :on-click #(state/set-time!
-                            @(rf/subscribe [:project/media-element])
+                            (<sub [:project/media-element])
                             (/ (+ (-> % .-currentTarget .-scrollLeft)
                                   (.-pageX %)
                                   -106)
-                               @(rf/subscribe [:project/px-per-sec])))}
+                               (<sub [:project/px-per-sec])))}
           [ticks]
           [:div {:style {:white-space "nowrap"
                          :display "inline-block"}}

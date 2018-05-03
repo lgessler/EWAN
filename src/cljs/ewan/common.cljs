@@ -7,6 +7,10 @@
 (defn first-child [hiccup] (nth hiccup 2))
 (defn children [hiccup] (drop 2 hiccup))
 
+;; re-frame shorthands
+(def <sub (comp deref rf/subscribe))
+(def >evt rf/dispatch)
+
 (defn- simple-sub
   "Convenience function for subs that just take a single value out of `db`"
   ([kwd]
