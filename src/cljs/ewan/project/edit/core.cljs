@@ -1,5 +1,6 @@
 (ns ewan.project.edit.core
   (:require [re-frame.core :as rf]
+            [ewan.common :refer [<sub >evt]]
             [ewan.spec.eaf30 :as eaf30]
             [ewan.project.edit.tiers :as tiers]
             [ewan.project.edit.state :as state]
@@ -35,10 +36,10 @@
       (fn [media-map]
         (if (= (:type media-map) :video)
           [:video.media-panel__video
-           {:ref #(rf/dispatch-sync [:project/set-media-element %])
-            :on-loaded-metadata #(rf/dispatch [:project/record-duration (-> % .-target .-duration)])
+           {:ref #(>evt [:project/set-media-element %])
+            :on-loaded-metadata #(>evt [:project/record-duration (-> % .-target .-duration)])
             :on-time-update
-            #(rf/dispatch [:project/time-updated (-> % .-target .-currentTime)])}]
+            #(>evt [:project/time-updated (-> % .-target .-currentTime)])}]
           [:div "Audio"]))})))
 
 (defn- time-container [playback]
@@ -58,31 +59,31 @@
     [:div.media-panel__playback-buttons
      [playback-button {:icon-name "first_page"
                        :on-click (fn []
-                                   (rf/dispatch [:project/stop-playback])
-                                   (rf/dispatch [:project/set-scroll-left 0])
+                                   (>evt [:project/stop-playback])
+                                   (>evt [:project/set-scroll-left 0])
                                    (state/set-time! @elt 0))}]
      [playback-button {:icon-name "replay_5"
                        :on-click (fn []
-                                   (rf/dispatch [:project/stop-playback])
+                                   (>evt [:project/stop-playback])
                                    (state/add-time! @elt -5))}]
      [playback-button {:icon-name "navigate_before"
                        :on-click (fn []
-                                   (rf/dispatch [:project/stop-playback])
+                                   (>evt [:project/stop-playback])
                                    (state/add-time! @elt -0.02))}]
      [playback-button {:icon-name (if (:play @playback) "pause" "play_arrow")
                        :on-click (fn []
-                                   (rf/dispatch [:project/toggle-playback]))}]
+                                   (>evt [:project/toggle-playback]))}]
      [playback-button {:icon-name "navigate_next"
                        :on-click (fn []
-                                   (rf/dispatch [:project/stop-playback])
+                                   (>evt [:project/stop-playback])
                                    (state/add-time! @elt 0.02))}]
      [playback-button {:icon-name "forward_5"
                        :on-click (fn []
-                                   (rf/dispatch [:project/stop-playback])
+                                   (>evt [:project/stop-playback])
                                    (state/add-time! @elt 5))}]
      [playback-button {:icon-name "last_page"
                        :on-click (fn []
-                                   (rf/dispatch [:project/stop-playback])
+                                   (>evt [:project/stop-playback])
                                    (state/set-time! @elt :end))}]]))
 
 (defn- media-panel-outer []
