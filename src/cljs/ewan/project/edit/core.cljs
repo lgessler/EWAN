@@ -56,20 +56,34 @@
 (defn- playback-buttons [playback]
   (let [elt (rf/subscribe [:project/media-element])]
     [:div.media-panel__playback-buttons
-     [playback-button {:on-click #(state/set-time! @elt 0)
-                       :icon-name "first_page"}]
-     [playback-button {:on-click #(state/add-time! @elt -5)
-                       :icon-name "replay_5"}]
-     [playback-button {:on-click #(state/add-time! @elt -0.02)
-                       :icon-name "navigate_before"}]
-     [playback-button {:on-click #(rf/dispatch [:project/toggle-playback])
-                       :icon-name (if (:play @playback) "pause" "play_arrow")}]
-     [playback-button {:on-click #(state/add-time! @elt 0.02)
-                       :icon-name "navigate_next"}]
-     [playback-button {:on-click #(state/add-time! @elt 5)
-                       :icon-name "forward_5"}]
-     [playback-button {:on-click #(state/set-time! @elt :end)
-                       :icon-name "last_page"}]]))
+     [playback-button {:icon-name "first_page"
+                       :on-click (fn []
+                                   (rf/dispatch [:project/stop-playback])
+                                   (rf/dispatch [:project/set-scroll-left 0])
+                                   (state/set-time! @elt 0))}]
+     [playback-button {:icon-name "replay_5"
+                       :on-click (fn []
+                                   (rf/dispatch [:project/stop-playback])
+                                   (state/add-time! @elt -5))}]
+     [playback-button {:icon-name "navigate_before"
+                       :on-click (fn []
+                                   (rf/dispatch [:project/stop-playback])
+                                   (state/add-time! @elt -0.02))}]
+     [playback-button {:icon-name (if (:play @playback) "pause" "play_arrow")
+                       :on-click (fn []
+                                   (rf/dispatch [:project/toggle-playback]))}]
+     [playback-button {:icon-name "navigate_next"
+                       :on-click (fn []
+                                   (rf/dispatch [:project/stop-playback])
+                                   (state/add-time! @elt 0.02))}]
+     [playback-button {:icon-name "forward_5"
+                       :on-click (fn []
+                                   (rf/dispatch [:project/stop-playback])
+                                   (state/add-time! @elt 5))}]
+     [playback-button {:icon-name "last_page"
+                       :on-click (fn []
+                                   (rf/dispatch [:project/stop-playback])
+                                   (state/set-time! @elt :end))}]]))
 
 (defn- media-panel-outer []
   (let [playback (rf/subscribe [:project/playback])]

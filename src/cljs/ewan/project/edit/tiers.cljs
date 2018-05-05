@@ -14,12 +14,17 @@
   [a-ann]
   ;; TODO: find out why time-slot-ref1 and ref2 are sometimes allowed
   ;; to refer to time-slots without a value
-  [:svg (merge (<sub [:project/ann-svg-attrs a-ann])
-               {:on-click #(js/alert "hi")
-                :style {:pointer-events "bounding-box"}})
-   [:path (<sub [:project/ann-path-attrs a-ann])]
-   [:text (<sub [:project/ann-text-attrs])
-    (<sub [:project/ann-text-value a-ann])]])
+  (let [elt (<sub [:project/media-element])
+        t (<sub [:project/ann-begin-time a-ann])]
+    [:svg (merge (<sub [:project/ann-svg-attrs a-ann])
+                 {:style {:pointer-events "bounding-box"}
+                  :on-click (fn [e]
+                              (.stopPropagation e)
+                              (rf/dispatch [:project/stop-playback])
+                              (state/set-time! elt t))})
+     [:path (<sub [:project/ann-path-attrs a-ann])]
+     [:text (<sub [:project/ann-text-attrs])
+      (<sub [:project/ann-text-value a-ann])]]))
 
 (def ^:private ref-annotation alignable-annotation)
 
@@ -41,11 +46,11 @@
        [annotation ann]))]])
 
 (defn- tier-rows [tiers]
-    [:div.tier-rows__container
-     (doall
-      (for [tier @tiers]
-        ^{:key (-> tier attrs :tier-id)}
-        [tier-row tier]))])
+  [:div.tier-rows__container
+   (doall
+    (for [tier @tiers]
+      ^{:key (-> tier attrs :tier-id)}
+      [tier-row tier]))])
 
 (defn- tier-labels [tiers]
   [:div.tier-labels__container
@@ -82,10 +87,12 @@
   []
   (r/with-let [tiers (rf/subscribe [:project/tiers])
                !div (atom nil)
+               ;; create just one instance of the function that will inform the DB of scroll position
+               ;; and debounce it so it will not fire too often (scroll events fire very quickly)
                handle-scroll
                (goog.functions.debounce
                 #(>evt [:project/set-scroll-left
-                         (-> % .-target .-scrollLeft)])
+                        (-> % .-target .-scrollLeft)])
                 100)
                on-scroll
                (fn [e]
@@ -109,12 +116,14 @@
                         :font-size 0}
                 :ref #(reset! !div %)
                 :on-scroll on-scroll
-                :on-click #(state/set-time!
-                            (<sub [:project/media-element])
-                            (/ (+ (-> % .-currentTarget .-scrollLeft)
-                                  (.-pageX %)
-                                  -106)
-                               (<sub [:project/px-per-sec])))}
+                :on-click (fn [e]
+                            (>evt [:project/stop-playback])
+                            (state/set-time!
+                             (<sub [:project/media-element])
+                             (/ (+ (-> e .-currentTarget .-scrollLeft)
+                                   (.-pageX e)
+                                   -106) ;; TODO: get rid of hardcode
+                                (<sub [:project/px-per-sec]))))}
           [ticks]
           [:div {:style {:white-space "nowrap"
                          :display "inline-block"}}

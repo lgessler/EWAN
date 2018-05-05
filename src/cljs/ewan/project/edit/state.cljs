@@ -11,11 +11,12 @@
 ;; project/px-per-sec
 ;; project/current-project
 
-(def ^:private default-db {:project/playback {}
-                           :project/media (list)
-                           :project/loaded false
-                           :project/px-per-sec 150
-                           :project/scroll-left 0})
+(def ^:private default-db
+  {:project/playback {}       ;; contains information about the media being played
+   :project/media (list)      ;; list of playable media elements
+   :project/loaded false
+   :project/px-per-sec 150
+   :project/scroll-left 0})     ;; the horizontal scroll amount for tiers
 
 ;; if you change these, be sure to change the LESS variable as well
 (def ^:private TIER_HEIGHT 32)
@@ -130,6 +131,38 @@
  (fn [db [_ duration]]
    (assoc-in db [:project/playback :duration] duration)))
 
+;; :project/time-updated is an event fired by the HTMLMediaElement
+(defn- find-left-offset
+  ([e]
+   (find-left-offset 0 e))
+  ([acc e]
+   (if (and e (.-offsetLeft e))
+     (recur (+ (.-offsetLeft e) acc) (.-offsetParent e))
+     acc)))
+
+(rf/reg-cofx
+ :tier-visual-width
+ (fn [cofx _]
+   (let [viewport-width (.-innerWidth js/window)
+         left (find-left-offset
+               (.querySelector js/document ".tier-rows__container"))]
+     (assoc cofx :tier-visual-width (- viewport-width left)))))
+
+(rf/reg-event-fx
+ :project/time-updated
+ [(rf/inject-cofx :tier-visual-width)]
+ (fn [{:keys [db tier-visual-width]} [_ time]]
+   (let [pps (:project/px-per-sec db)
+         time-in-px (* time pps)
+         scroll-left (:project/scroll-left db)
+         playing (get-in db [:project/playback :play])
+         cursor-off-screen (> (+ time-in-px (* pps 0.5))
+                              (+ scroll-left tier-visual-width))]
+     {:db (cond-> db
+            true (assoc-in [:project/playback :time] time)
+            (and playing
+                 cursor-off-screen) (assoc :project/scroll-left (- time-in-px 100)))})))
+
 ;; These events are used by many components to control playback
 (rf/reg-event-db
  :project/toggle-playback
@@ -137,9 +170,9 @@
    (update-in db [:project/playback :play] not)))
 
 (rf/reg-event-db
- :project/time-updated
- (fn [db [_ time]]
-   (assoc-in db [:project/playback :time] time)))
+ :project/stop-playback
+ (fn [db _]
+   (assoc-in db [:project/playback :play] false)))
 
 (rf/reg-event-db
  :project/set-media-element
@@ -148,30 +181,24 @@
 
 (rf/reg-event-db
  :project/set-scroll-left
- (fn [db [_ v]]
-   (assoc db :project/scroll-left v)))
+ (fn [db [_ s]]
+   (assoc db :project/scroll-left s)))
 
 ;; These modify the media element's time directly, in keeping with our
 ;; convention that the :project/playback map's :time value is only ever
 ;; set with on-time-update firing from the element.
 (defn set-time!
   [elt time]
-  (when (and (= time :end) (not (.-paused elt)))
-    (rf/dispatch-sync [:project/toggle-playback]))
   (set! (.-currentTime elt)
         (if (= time :end)
           (.-duration elt)
           time)))
+;; TODO: dispatch some kind of event that handles setting scroll-left to an appropriate val
 
 (defn add-time!
   [elt time]
-  (when (and (>= (+ time (.-currentTime elt)) (.-duration elt))
-             (not (.-paused elt)))
-    (rf/dispatch-sync [:project/toggle-playback]))
   (set! (.-currentTime elt)
         (+ time (.-currentTime elt))))
-
-
 
 ;; ----------------------------------------------------------------------------
 ;; subs
@@ -219,6 +246,13 @@
     :width width
     :x (* ppms time1)
     :y 0}))
+
+(rf/reg-sub
+ :project/ann-begin-time
+ (fn [[_ ann] _]
+   (rf/subscribe [:project/ann-times ann]))
+ (fn [{:keys [time1]} _]
+   (/ time1 1000)))
 
 (rf/reg-sub
  :project/ann-path-attrs
