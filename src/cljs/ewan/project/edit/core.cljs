@@ -59,31 +59,31 @@
     [:div.media-panel__playback-buttons
      [playback-button {:icon-name "first_page"
                        :on-click (fn []
-                                   (>evt [:project/stop-playback])
+                                   (rf/dispatch-sync [:project/stop-playback])
                                    (>evt [:project/set-scroll-left 0])
                                    (state/set-time! @elt 0))}]
      [playback-button {:icon-name "replay_5"
                        :on-click (fn []
-                                   (>evt [:project/stop-playback])
+                                   (rf/dispatch-sync [:project/stop-playback])
                                    (state/add-time! @elt -5))}]
      [playback-button {:icon-name "navigate_before"
                        :on-click (fn []
-                                   (>evt [:project/stop-playback])
+                                   (rf/dispatch-sync [:project/stop-playback])
                                    (state/add-time! @elt -0.02))}]
      [playback-button {:icon-name (if (:play @playback) "pause" "play_arrow")
                        :on-click (fn []
-                                   (>evt [:project/toggle-playback]))}]
+                                   (rf/dispatch-sync [:project/toggle-playback]))}]
      [playback-button {:icon-name "navigate_next"
                        :on-click (fn []
-                                   (>evt [:project/stop-playback])
+                                   (rf/dispatch-sync [:project/stop-playback])
                                    (state/add-time! @elt 0.02))}]
      [playback-button {:icon-name "forward_5"
                        :on-click (fn []
-                                   (>evt [:project/stop-playback])
+                                   (rf/dispatch-sync [:project/stop-playback])
                                    (state/add-time! @elt 5))}]
      [playback-button {:icon-name "last_page"
                        :on-click (fn []
-                                   (>evt [:project/stop-playback])
+                                   (rf/dispatch-sync [:project/stop-playback])
                                    (state/set-time! @elt :end))}]]))
 
 (defn- media-panel-outer []

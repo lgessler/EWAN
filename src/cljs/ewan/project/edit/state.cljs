@@ -156,12 +156,23 @@
          time-in-px (* time pps)
          scroll-left (:project/scroll-left db)
          playing (get-in db [:project/playback :play])
-         cursor-off-screen (> (+ time-in-px (* pps 0.5))
-                              (+ scroll-left tier-visual-width))]
+         left-bound scroll-left
+         right-bound (- (+ scroll-left tier-visual-width) 30) ;; vertical scrollbar takes some space
+         right-bound-while-playing (- right-bound 70)]
+     (js/console.log "Updated!  " left-bound "<" time-in-px "<" right-bound)
      {:db (cond-> db
-            true (assoc-in [:project/playback :time] time)
-            (and playing
-                 cursor-off-screen) (assoc :project/scroll-left (- time-in-px 100)))})))
+            true
+            (assoc-in [:project/playback :time] time)
+            (and playing (> time-in-px right-bound-while-playing))
+            (assoc :project/scroll-left (- time-in-px 100))
+            ;; we don't do bounds checking on these, so it's possible they'll get set to a value
+            ;; outside of the interval [0, width], but this is OK since :project/scroll-left's
+            ;; only purpose is to set the scroll left attr on the tier dom element, which accepts
+            ;; values outside the interval without harm
+            (> time-in-px right-bound)
+            (assoc :project/scroll-left (+ (- time-in-px right-bound) left-bound))
+            (< time-in-px left-bound)
+            (assoc :project/scroll-left (- time-in-px 20)))})))
 
 ;; These events are used by many components to control playback
 (rf/reg-event-db

@@ -101,6 +101,7 @@
                update
                (fn [comp]
                  (let [{:keys [scroll-left]} (r/props comp)]
+                   (js/console.log "Comparing .-scrollLeft [" (.-scrollLeft @!div) "] with DB value: " scroll-left)
                    (when (not= (.-scrollLeft @!div) scroll-left)
                      (set! (.-scrollLeft @!div) scroll-left))))]
     (r/create-class
