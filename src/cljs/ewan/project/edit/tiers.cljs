@@ -69,7 +69,29 @@
   (let [pps (rf/subscribe [:project/px-per-sec])
         duration (rf/subscribe [:project/duration])]
     [:div.ticks__container
-     [:div.ticks__spacer]
+     [:div.ticks__spacer
+      [ui/icon-button {:icon-class-name "material-icons"
+                       :icon-style {:width "18px" :height "18px" :color "inherit"}
+                       :style {:width "24px" :height "24px" :padding "3px" :color "#bbb"}
+                       :hovered-style {:color "black"}
+                       :tooltip "Zoom in"
+                       :tooltip-position "bottom-center"
+                       :on-click (fn [e]
+                                   (.stopPropagation e)
+                                   (>evt [:project/decr-px-per-sec]))}
+       "zoom_out"]
+      [ui/icon-button {:icon-class-name "material-icons"
+                       :icon-style {:width "18px" :height "18px" :color "inherit"}
+                       :style {:width "24px" :height "24px" :padding "3px" :color "#bbb"}
+                       :hovered-style {:color "black"}
+                       :tooltip "Zoom out"
+                       :tooltip-position "bottom-center"
+                       :on-click (fn [e]
+                                   (.stopPropagation e)
+                                   (>evt [:project/incr-px-per-sec]))}
+       "zoom_in"]
+      
+      ]
      [:svg.ticks {:width (* @pps @duration)}
       ;; use decisecs to avoid float precision issues
       (doall
@@ -101,7 +123,6 @@
                update
                (fn [comp]
                  (let [{:keys [scroll-left]} (r/props comp)]
-                   (js/console.log "Comparing .-scrollLeft [" (.-scrollLeft @!div) "] with DB value: " scroll-left)
                    (when (not= (.-scrollLeft @!div) scroll-left)
                      (set! (.-scrollLeft @!div) scroll-left))))]
     (r/create-class

@@ -125,6 +125,17 @@
                                       (first file-maps)))
          (assoc :project/loaded true)))))
 
+;; incr and decr pps
+(rf/reg-event-db
+ :project/incr-px-per-sec
+ (fn [db _]
+   (assoc db :project/px-per-sec (min (+ (:project/px-per-sec db) 10) 300))))
+
+(rf/reg-event-db
+ :project/decr-px-per-sec
+ (fn [db _]
+   (assoc db :project/px-per-sec (max (- (:project/px-per-sec db) 10) 50))))
+
 ;; tests for File objects attached to documents
 (rf/reg-event-db
  :project/record-duration
@@ -159,7 +170,6 @@
          left-bound scroll-left
          right-bound (- (+ scroll-left tier-visual-width) 30) ;; vertical scrollbar takes some space
          right-bound-while-playing (- right-bound 70)]
-     (js/console.log "Updated!  " left-bound "<" time-in-px "<" right-bound)
      {:db (cond-> db
             true
             (assoc-in [:project/playback :time] time)
