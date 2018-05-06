@@ -74,8 +74,6 @@
                        :icon-style {:width "18px" :height "18px" :color "inherit"}
                        :style {:width "24px" :height "24px" :padding "3px" :color "#bbb"}
                        :hovered-style {:color "black"}
-                       :tooltip "Zoom in"
-                       :tooltip-position "bottom-center"
                        :on-click (fn [e]
                                    (.stopPropagation e)
                                    (>evt [:project/decr-px-per-sec]))}
@@ -84,14 +82,10 @@
                        :icon-style {:width "18px" :height "18px" :color "inherit"}
                        :style {:width "24px" :height "24px" :padding "3px" :color "#bbb"}
                        :hovered-style {:color "black"}
-                       :tooltip "Zoom out"
-                       :tooltip-position "bottom-center"
                        :on-click (fn [e]
                                    (.stopPropagation e)
                                    (>evt [:project/incr-px-per-sec]))}
-       "zoom_in"]
-      
-      ]
+       "zoom_in"]]
      [:svg.ticks {:width (* @pps @duration)}
       ;; use decisecs to avoid float precision issues
       (doall

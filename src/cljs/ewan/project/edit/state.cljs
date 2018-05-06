@@ -134,7 +134,7 @@
 (rf/reg-event-db
  :project/decr-px-per-sec
  (fn [db _]
-   (assoc db :project/px-per-sec (max (- (:project/px-per-sec db) 10) 50))))
+   (assoc db :project/px-per-sec (max (- (:project/px-per-sec db) 10) 80))))
 
 ;; tests for File objects attached to documents
 (rf/reg-event-db
