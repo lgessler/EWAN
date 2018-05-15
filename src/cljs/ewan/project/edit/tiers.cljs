@@ -4,8 +4,7 @@
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]
             [cljs-react-material-ui.icons :as ic]
-            [ewan.common :refer [tag-name attrs first-child children
-                                 <sub >evt]]
+            [ewan.common :refer [tag-name attrs first-child children <sub >evt]]
             [ewan.project.edit.state :as state]
             [reagent.core :as r]
             [goog.functions]))
@@ -15,7 +14,8 @@
   ;; TODO: find out why time-slot-ref1 and ref2 are sometimes allowed
   ;; to refer to time-slots without a value
   (let [elt (<sub [:project/media-element])
-        t (<sub [:project/ann-begin-time a-ann])]
+        t (<sub [:project/ann-begin-time a-ann])
+        id (-> a-ann attrs :annotation-id)]
     [:svg (merge (<sub [:project/ann-svg-attrs a-ann])
                  {:style {:pointer-events "bounding-box"}
                   :on-click (fn [e]
@@ -26,8 +26,15 @@
      [:text (<sub [:project/ann-text-attrs])
       (<sub [:project/ann-text-value a-ann])]]))
 
+;; for now, there doesn't seem to be a reason to treat them differently
 (def ^:private ref-annotation alignable-annotation)
 
+;; Argument looks something like this:
+;; [:annotation {} ;; <-- always empty
+;;  [:alignable-annotation {...} ;; <-- has attrs
+;;   [:annotation-value {}
+;;    ...]]]
+;; (Yes, the outer hiccup node doesn't appear to serve a purpose)
 (defn- annotation
   [[_ _ [ann-type _ _ :as inner-ann]]]
   (condp = ann-type
@@ -62,30 +69,42 @@
         [:div.tier-labels__row tier-id])))])
 
 (defn- crosshair []
+  "A line aligned with a certain time that indicates
+   the current point in the playback of the media"
   (let [{:keys [left]} (<sub [:project/crosshair-display-info])]
     [:div.crosshair {:style {:left (str (+ 100 left) "px")}}]))
 
+(defn- decrease-pps-button []
+  [ui/icon-button
+   {:icon-class-name "material-icons"
+    :icon-style {:width "18px" :height "18px" :color "inherit"}
+    :style {:width "24px" :height "24px" :padding "3px" :color "#bbb"}
+    :hovered-style {:color "black"}
+    :on-click (fn [e]
+                (.stopPropagation e)
+                (>evt [:project/decr-px-per-sec]))}
+   "zoom_out"])
+
+(defn- increase-pps-button []
+  [ui/icon-button
+   {:icon-class-name "material-icons"
+    :icon-style {:width "18px" :height "18px" :color "inherit"}
+    :style {:width "24px" :height "24px" :padding "3px" :color "#bbb"}
+    :hovered-style {:color "black"}
+    :on-click (fn [e]
+                (.stopPropagation e)
+                (>evt [:project/incr-px-per-sec]))}
+   "zoom_in"])
+
 (defn- ticks []
+  "A thin strip with a tick at every decisecond and a timestamp at every second. Also
+   includes buttons for increasing or decreasing pixels per second"
   (let [pps (rf/subscribe [:project/px-per-sec])
         duration (rf/subscribe [:project/duration])]
     [:div.ticks__container
-     [:div.ticks__spacer
-      [ui/icon-button {:icon-class-name "material-icons"
-                       :icon-style {:width "18px" :height "18px" :color "inherit"}
-                       :style {:width "24px" :height "24px" :padding "3px" :color "#bbb"}
-                       :hovered-style {:color "black"}
-                       :on-click (fn [e]
-                                   (.stopPropagation e)
-                                   (>evt [:project/decr-px-per-sec]))}
-       "zoom_out"]
-      [ui/icon-button {:icon-class-name "material-icons"
-                       :icon-style {:width "18px" :height "18px" :color "inherit"}
-                       :style {:width "24px" :height "24px" :padding "3px" :color "#bbb"}
-                       :hovered-style {:color "black"}
-                       :on-click (fn [e]
-                                   (.stopPropagation e)
-                                   (>evt [:project/incr-px-per-sec]))}
-       "zoom_in"]]
+     [:div.ticks__spacer ;; provides horizontal space in addition to holding the buttons
+      [decrease-pps-button]
+      [increase-pps-button]]
      [:svg.ticks {:width (* @pps @duration)}
       ;; use decisecs to avoid float precision issues
       (doall
@@ -100,25 +119,26 @@
              [:line {:key decisec :x1 x :x2 x :y1 0 :y2 3 :stroke-width 0.5 :stroke "black"}]))))]]))
 
 (defn- tiers-inner
+  "We need sophisticated handling to allow control of this div's scrollLeft property
+   from the re-frame database's variable for it. Whenever :project/scroll-left is
+   updated, this reagent component's did-update event is fired"
   []
-  (r/with-let [tiers (rf/subscribe [:project/tiers])
-               !div (atom nil)
-               ;; create just one instance of the function that will inform the DB of scroll position
-               ;; and debounce it so it will not fire too often (scroll events fire very quickly)
-               handle-scroll
-               (goog.functions.debounce
-                #(>evt [:project/set-scroll-left
-                        (-> % .-target .-scrollLeft)])
-                100)
-               on-scroll
-               (fn [e]
+  (r/with-let
+    [tiers (rf/subscribe [:project/tiers])
+     !div (atom nil)
+     ;; create just one instance of the function that will inform the DB of scroll position
+     ;; and debounce it so it will not fire too often (scroll events fire very quickly)
+     handle-scroll (goog.functions.debounce
+                    #(>evt [:project/set-scroll-left
+                            (-> % .-target .-scrollLeft)])
+                    100)
+     on-scroll (fn [e]
                  (.persist e)
                  (handle-scroll e))
-               update
-               (fn [comp]
-                 (let [{:keys [scroll-left]} (r/props comp)]
-                   (when (not= (.-scrollLeft @!div) scroll-left)
-                     (set! (.-scrollLeft @!div) scroll-left))))]
+     update (fn [comp]
+              (let [{:keys [scroll-left]} (r/props comp)]
+                (when (not= (.-scrollLeft @!div) scroll-left)
+                  (set! (.-scrollLeft @!div) scroll-left))))]
     (r/create-class
      {:component-did-update
       update
@@ -148,6 +168,7 @@
           [crosshair]]])})))
 
 (defn tiers []
+  "See https://github.com/Day8/re-frame/blob/master/docs/Using-Stateful-JS-Components.md"
   (let [scroll-left (rf/subscribe [:project/scroll-left])]
     (fn []
       [tiers-inner {:scroll-left @scroll-left}])))
