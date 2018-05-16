@@ -20,8 +20,9 @@
                  {:style {:pointer-events "bounding-box"}
                   :on-click (fn [e]
                               (.stopPropagation e)
+                              (state/set-time! elt t)
                               (rf/dispatch [:project/stop-playback])
-                              (state/set-time! elt t))})
+                              (rf/dispatch [:project/select-ann id]))})
      [:path (<sub [:project/ann-path-attrs a-ann])]
      [:text (<sub [:project/ann-text-attrs])
       (<sub [:project/ann-text-value a-ann])]]))
@@ -71,8 +72,12 @@
 (defn- crosshair []
   "A line aligned with a certain time that indicates
    the current point in the playback of the media"
-  (let [{:keys [left]} (<sub [:project/crosshair-display-info])]
-    [:div.crosshair {:style {:left (str (+ 100 left) "px")}}]))
+  (fn []
+    (let [{:keys [left width]} (<sub [:project/crosshair-display-info])]
+      [:div.crosshair {:style {:left (str (+ 100 left) "px")
+                               ;; subtract 1 to account for 1px left border
+                               :width (str (max 0 (- width 1))
+                                           "px")}}])))
 
 (defn- decrease-pps-button []
   [ui/icon-button

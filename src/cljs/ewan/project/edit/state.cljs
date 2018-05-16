@@ -1,6 +1,6 @@
 (ns ewan.project.edit.state
   (:require [re-frame.core :as rf]
-            [ewan.common :refer [simple-sub]]
+            [ewan.common :refer [simple-sub >evt <sub]]
             [ewan.spec.eaf30 :as eaf30]
             [cljs.spec.alpha :as s]))
 
@@ -16,7 +16,8 @@
    :project/media (list)      ;; list of playable media elements
    :project/loaded false
    :project/px-per-sec 150
-   :project/scroll-left 0})     ;; the horizontal scroll amount for tiers
+   :project/scroll-left 0     ;; the horizontal scroll amount for tiers
+   :project/selected-ann-id nil})
 
 ;; if you change these, be sure to change the LESS variable as well
 (def ^:private TIER_HEIGHT 32)
@@ -205,6 +206,16 @@
  (fn [db [_ s]]
    (assoc db :project/scroll-left s)))
 
+(rf/reg-event-db
+ :project/clear-selection
+ (fn [db _]
+   (dissoc db :project/selected-ann-id)))
+
+(rf/reg-event-db
+ :project/select-ann
+ (fn [db [_ id]]
+   (assoc db :project/selected-ann-id id)))
+
 ;; These modify the media element's time directly, in keeping with our
 ;; convention that the :project/playback map's :time value is only ever
 ;; set with on-time-update firing from the element.
@@ -213,7 +224,8 @@
   (set! (.-currentTime elt)
         (if (= time :end)
           (.-duration elt)
-          time)))
+          time))
+  (rf/dispatch [:project/clear-selection]))
 ;; TODO: dispatch some kind of event that handles setting scroll-left to an appropriate val
 
 (defn add-time!
@@ -229,10 +241,13 @@
 (simple-sub :project/playback)
 (simple-sub :project/px-per-sec)
 (simple-sub :project/scroll-left)
+(simple-sub :project/selected-ann-id)
 (simple-sub :project/media-element [:project/playback :media-element])
 (simple-sub :project/time [:project/playback :time])
 (simple-sub :project/duration [:project/playback :duration])
 (simple-sub :project/current-eaf [:project/current-project :eaf])
+
+
 
 (rf/reg-sub
  :project/px-per-ms
@@ -306,6 +321,14 @@
  (fn [db [_ ann]]
    (-> ann (nth 2) (nth 2 nil))))
 
+(rf/reg-sub
+ :project/selection-duration
+ :<- [:project/current-eaf]
+ :<- [:project/selected-ann-id]
+ (fn [[eaf id] _]
+   (let [{:keys [time1 time2]} (eaf30/get-annotation-times eaf id)]
+     (/ (- time2 time1) 1000))))
+
 ;; tier subs
 ;; ----------------------------------------------------------------------------
 (rf/reg-sub
@@ -332,8 +355,10 @@
  :project/crosshair-display-info
  :<- [:project/time]
  :<- [:project/px-per-sec]
- (fn [[time pps] _]
-   {:left (* pps time)}))
+ :<- [:project/selection-duration]
+ (fn [[time pps duration] _]
+   {:left (* pps time)
+    :width (* pps duration)}))
 
 
 
