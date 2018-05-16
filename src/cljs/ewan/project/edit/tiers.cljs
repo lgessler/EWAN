@@ -11,6 +11,8 @@
 
 ;; keep in sync with @tier-label-width in less
 (def ^:private LABEL_WIDTH 100)
+(def ^:private MARGIN 6)
+(def ^:private TIER_CONTENT_OFFSET (+ MARGIN LABEL_WIDTH))
 
 (defn- alignable-annotation
   [a-ann]
@@ -58,11 +60,38 @@
        [annotation ann]))]])
 
 (defn- tier-rows [tiers]
-  [:div.tier-rows__container
-   (doall
-    (for [tier @tiers]
-      ^{:key (-> tier attrs :tier-id)}
-      [tier-row tier]))])
+  (r/with-let [start-time (atom nil)]
+    (fn []
+      (let [pps (<sub [:project/px-per-sec])
+            x-to-sec #(/ (- % TIER_CONTENT_OFFSET) pps)
+            offset (<sub [:project/scroll-left])]
+        [:div.tier-rows__container
+         ;; forming selections by dragging is handled here
+         ;; ELAN has more sophisticated control of selection forming
+         ;; for aligned tiers, but this is currently not implemented.
+         ;; Handling of right-to-left drag (which would seem to make
+         ;; a negative selection) is handled in the re-frame event
+         ;; handlers.
+         {:on-mouse-down
+          (fn [e]
+            (reset! start-time nil))
+          :on-mouse-move
+          (fn [e]
+            (.stopPropagation e)
+            (when (= (.-buttons e) 1)
+              (let [t (x-to-sec (+ offset (.-pageX e)))]
+                (state/set-time! (<sub [:project/media-element]) t)
+                (if-not @start-time
+                  (do
+                    (>evt [:project/set-selection t t])
+                    (reset! start-time t))
+                  (if (>= t @start-time)
+                    (>evt [:project/set-selection @start-time t])
+                    (>evt [:project/set-selection t @start-time]))))))}
+         (doall
+          (for [tier @tiers]
+            ^{:key (-> tier attrs :tier-id)}
+            [tier-row tier]))]))))
 
 (defn- tier-labels [tiers]
   [:div.tier-labels__container
@@ -157,7 +186,7 @@
       :reagent-render
       (fn []
         [ui/paper
-         {:style {:margin "6px"}}
+         {:style {:margin (str MARGIN "px")}}
          [:div {:style {:width "100%"
                         :position "relative"
                         :overflow-x "auto"
@@ -170,7 +199,7 @@
                              (<sub [:project/media-element])
                              (/ (+ (-> e .-currentTarget .-scrollLeft)
                                    (.-pageX e)
-                                   -106) ;; TODO: get rid of hardcode
+                                   (- TIER_CONTENT_OFFSET))
                                 (<sub [:project/px-per-sec]))))}
           [ticks]
           [:div {:style {:white-space "nowrap"
