@@ -9,6 +9,9 @@
             [reagent.core :as r]
             [goog.functions]))
 
+;; keep in sync with @tier-label-width in less
+(def ^:private LABEL_WIDTH 100)
+
 (defn- alignable-annotation
   [a-ann]
   ;; TODO: find out why time-slot-ref1 and ref2 are sometimes allowed
@@ -20,10 +23,11 @@
                  {:style {:pointer-events "bounding-box"}
                   :on-click (fn [e]
                               (.stopPropagation e)
-                              (state/set-time! elt t)
                               (rf/dispatch [:project/stop-playback])
-                              (rf/dispatch [:project/select-ann id]))})
-     [:path (<sub [:project/ann-path-attrs a-ann])]
+                              (rf/dispatch [:project/select-ann id])
+                              (state/set-time! elt t))})
+     [:path (merge (<sub [:project/ann-path-attrs a-ann])
+                   (<sub [:project/ann-path-color a-ann]))]
      [:text (<sub [:project/ann-text-attrs])
       (<sub [:project/ann-text-value a-ann])]]))
 
@@ -73,11 +77,14 @@
   "A line aligned with a certain time that indicates
    the current point in the playback of the media"
   (fn []
-    (let [{:keys [left width]} (<sub [:project/crosshair-display-info])]
-      [:div.crosshair {:style {:left (str (+ 100 left) "px")
-                               ;; subtract 1 to account for 1px left border
-                               :width (str (max 0 (- width 1))
-                                           "px")}}])))
+    (let [{:keys [left]} (<sub [:project/crosshair-display-info])]
+      [:div.crosshair {:style {:left (str (+ LABEL_WIDTH left) "px")}}])))
+
+(defn- selection []
+  (fn []
+    (let [{:keys [left width]} (<sub [:project/selection-display-info])]
+      [:div.selection {:style {:left (str (+ LABEL_WIDTH left) "px")
+                               :width (str width "px")}}])))
 
 (defn- decrease-pps-button []
   [ui/icon-button
@@ -170,6 +177,7 @@
                          :display "inline-block"}}
            [tier-labels tiers]
            [tier-rows tiers]]
+          [selection]
           [crosshair]]])})))
 
 (defn tiers []

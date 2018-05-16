@@ -120,11 +120,12 @@ div.media-panel__playback-buttons {
 
 @light-gray: rgba(0,0,0,0.1);
 @tier-height: 32px;
+@tier-label-width: 100px; /* keep in sync with LABEL_WIDTH in tiers.cljs */
 
 div.tier-labels__container {
     position: sticky;
     left: 0px;
-    width: 100px;
+    width: @tier-label-width;
     vertical-align: baseline;
     display: inline-block;
     background-color: white;
@@ -163,6 +164,14 @@ div.crosshair {
     top: 0px;
     width: 1px;
     border-left: 1px solid red;
+    height: 100%;
+    pointer-events: none;
+}
+
+div.selection {
+    position: absolute;
+    top: 0px;
+    width: 0px;
     background-color: rgba(0,0,125,0.10);
     height: 100%;
     pointer-events: none;
@@ -177,7 +186,7 @@ div.ticks__container {
 }
 
 div.ticks__spacer {
-    width: 96px;
+    width: @tier-label-width - 4px;
     padding-right: 3px;
     border-right: 1px solid @light-gray;
     height: 24px;
