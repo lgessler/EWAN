@@ -656,18 +656,20 @@
 
 ;; NYI: get-* for linguistic types, locales, languages, etc.
 
-;; More involved getters and setters
+
+
+;; derived data structures and cache
 ;; ----------------------------------------------------------------------------
-;; Note that our strategy for many of these functions relies on building
-;; data structures out of the XML. Doing it on the fly would be too costly
-;; for many of them. Most of the time, we don't care about an old hiccup
+;; Non-trivial getters and setters rely on data that is most efficiently
+;; obtained from data structures that are derived from the XML.
+;; Most of the time, we don't care about an old hiccup
 ;; structure after we've encountered a new one, so we keep track of the
-;; latest one we've seen in `*latest-doc*` and cache derived structures
-;; in other vars (e.g. `*latest-annotation-map`).
+;; latest one we've seen in `:latest-doc` and cache derived structures
+;; with the other keys in `*cache*`.
 ;;
 ;; Functions that rely on derived structures call functions which are
 ;; prefixed with `build-`. These functions check to see if the hiccup
-;; they're given matches `*latest-doc*` and then either just return
+;; they're given matches `:latest-doc` and then either just return
 ;; the cached derived structure if it's the same, or build a new version
 ;; if it's different and set the appropriate var.
 ;;
@@ -675,7 +677,9 @@
 ;; pure and preserves referential transparency. It just gets us a
 ;; performance win a lot of the time.
 
-(def ^:private *latest-doc* nil)
+(def ^:private *cache* {:latest-doc nil
+                        :annotation-map nil
+                        :tier-parent-map nil})
 
 (defn get-time-slot-val [hiccup time-slot-id]
   "Determine the millisecond value of a time slot ID."
@@ -705,7 +709,6 @@
                      (int right-neighbor-val))
                   2))))))
 
-
 (defn- build-annotation-map [hiccup]
   "Returns a seq of elements that each corresponds to an annotation. A map
    is returned with the keys:
@@ -726,25 +729,6 @@
           {:ref annotation-ref}
           {:time1 (get-time-slot-val hiccup time-slot-ref1)
            :time2 (get-time-slot-val hiccup time-slot-ref2)})]))))
-(def ^:private *latest-annotation-map* nil)
-(defn- build-annotation-map-cached [hiccup]
-  (if (= *latest-doc* hiccup)
-    *latest-annotation-map*
-    (let [new-map (build-annotation-map hiccup)]
-      (set! *latest-annotation-map* new-map)
-      (set! *latest-doc* hiccup)
-      new-map)))
-
-(defn get-annotation-times
-  "Returns a map with keys :time1 :time2 representing the millisecond time
-   for a given annotation. If the annotation is a reference annotation, its
-   times are recursively resolved."
-  [hiccup ann-id]
-  (let [{:keys [ref] :as m}
-        (get (build-annotation-map-cached hiccup) ann-id)]
-    (if ref
-      (recur hiccup ref)
-      m)))
 
 (defn- build-tier-parent-map
   "map from tier-id's to parent-refs, e.g.:
@@ -756,14 +740,35 @@
         (for [a (map attrs (get-tiers hiccup))]
           (when (:parent-ref a)
             [(:tier-id a) (:parent-ref a)]))))
-(def ^:private *latest-tier-parent-map*)
+
+(defn- update-cache!
+  [hiccup]
+  (set! *cache* {:latest-doc hiccup
+                 :annotation-map (build-annotation-map hiccup)
+                 :tier-parent-map (build-tier-parent-map hiccup)}))
+
+(defn- build-annotation-map-cached [hiccup]
+  (when-not (= (:latest-doc *cache*) hiccup)
+    (update-cache! hiccup))
+  (:annotation-map *cache*))
+
 (defn- build-tier-parent-map-cached [hiccup]
-  (if (= *latest-doc* hiccup)
-    *latest-tier-parent-map*
-    (let [new-map (build-tier-parent-map hiccup)]
-      (set! *latest-tier-parent-map* new-map)
-      (set! *latest-doc* hiccup)
-     new-map)))
+  (when-not (= (:latest-doc *cache*) hiccup)
+    (update-cache! hiccup))
+  (:tier-parent-map *cache*))
+
+;; More involved getters and setters
+;; ----------------------------------------------------------------------------
+(defn get-annotation-times
+  "Returns a map with keys :time1 :time2 representing the millisecond time
+   for a given annotation. If the annotation is a reference annotation, its
+   times are recursively resolved."
+  [hiccup ann-id]
+  (let [{:keys [ref] :as m}
+        (get (build-annotation-map-cached hiccup) ann-id)]
+    (if ref
+      (recur hiccup ref)
+      m)))
 
 (defn get-parent-tiers
   "Given a tier ID, return a seq of parent tiers"
@@ -776,7 +781,19 @@
                     nil)))]
     (inner tier-id)))
 
+(defn is-parent-tier
+  "Given a tier ID, return true if there are other tiers
+   that refer to it with :parent-ref; nil otherwise"
+  [hiccup tier-id]
+  (some (fn [[child parent]]
+          (= parent tier-id))
+        (build-tier-parent-map-cached hiccup)))
+
+
+
 ;(def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
+
+
 
 ;(build-tier-inheritance-map *eaf)
 
