@@ -176,11 +176,13 @@
             (if (and (.ctrlKey e)
                      (= (.key e) "b"))
               (js/console.log "CTRL+b detected")))}
+       {:style {:visibility (if @loaded "unset" "hidden")}}
+       [:div.page-loading
+        {:style {:display (if @loaded "none" "unset")}}
+        [ui/circular-progress {:size 80
+                               :thickness 7}]]
        [upper-panel]
-       [tiers/tiers]]
-      [:div.page-loading
-       [ui/circular-progress {:size 80
-                              :thickness 7}]])))
+       [tiers/tiers]])))
 
 
 
