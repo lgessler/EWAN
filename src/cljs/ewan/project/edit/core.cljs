@@ -37,7 +37,8 @@
         (if (= (:type media-map) :video)
           [:video.media-panel__video
            {:ref #(>evt [:project/set-media-element %])
-            :on-loaded-metadata #(>evt [:project/record-duration (-> % .-target .-duration)])
+            :on-loaded-metadata
+            #(>evt [:project/record-duration (-> % .-target .-duration)])
             :on-time-update
             #(>evt [:project/time-updated (-> % .-target .-currentTime)])}]
           [:div "Audio"]))})))
@@ -46,45 +47,97 @@
   [:div.media-panel__time-container
    (state/time-format (:time @playback))])
 
+;; playback buttons
+(def ^:private button-style {:width "36px" :height "36px"
+                             :padding "6px" :display "flex"})
+
 (defn- playback-button
-  [{:keys [on-click icon-name]}]
-  [ui/icon-button {:icon-class-name "material-icons"
-                   :icon-style {:width "24px" :height "24px"}
-                   :style {:width "36px" :height "36px" :padding "6px"}
-                   :on-click on-click}
-   icon-name])
+  [{:keys [on-click icon style]}]
+  [ui/icon-button
+   {:style (merge button-style style)
+    :on-click on-click
+    :icon-class-name "material-icons"
+    :icon-style {:width "24px" :height "24px"}}
+   icon])
+
+(defn- play-selection-svg []
+  [:svg {:width "24"
+         :height "24"
+         :view-box "0 0 24 24"
+         :xmlns "http://www.w3.org/2000/svg"}
+   [:text {:x 12 :y 16
+           :style {:font-size "12px"
+                   :font-weight "500"
+                   :user-select "none"}}
+    "S"]
+   [:path {:d "M4 17l5-5-5-5v10z"}]
+   [:path {:fill "none" :d "M0 24V0h24v24H0z"}]])
+
+(defn- play-selection-button []
+  (let [start (<sub [:project/selection-start])
+        elt (<sub [:project/media-element])]
+    [ui/icon-button
+     {:style button-style
+      :disabled (not (<sub [:project/playable-selection?]))
+      :on-click (fn [e]
+                  ;; NYI: pause at the end of the selection
+                  (state/set-time! elt start)
+                  (rf/dispatch-sync [:project/start-playback]))}
+     (play-selection-svg)]))
+
+(defn- clear-selection-svg []
+  [:svg {:width "24"
+         :height "24"
+         :view-box "0 0 24 24"
+         :xmlns "http://www.w3.org/2000/svg"}
+   [:text {:x 8 :y 16
+           :style {:font-size "14px"
+                   :font-weight "400"
+                   :user-select "none"}}
+    "S"]
+   [:line {:x1 14 :y1 4 :x2 10 :y2 18 :style {:stroke "red" :stroke-width 1}}]
+   [:path {:fill "none" :d "M0 24V0h24v24H0z"}]])
+
+(defn- clear-selection-button []
+  [ui/icon-button
+   {:style button-style
+    :on-click #(>evt [:project/clear-selection])}
+   (clear-selection-svg)])
 
 (defn- playback-buttons [playback]
-  (let [elt (rf/subscribe [:project/media-element])]
+  (let [elt (<sub [:project/media-element])]
     [:div.media-panel__playback-buttons
-     [playback-button {:icon-name "first_page"
+     [playback-button {:icon "first_page"
                        :on-click (fn []
                                    (rf/dispatch-sync [:project/stop-playback])
                                    (>evt [:project/set-scroll-left 0])
-                                   (state/set-time! @elt 0))}]
-     [playback-button {:icon-name "replay_5"
+                                   (state/set-time! elt 0))}]
+     [playback-button {:icon "replay_5"
                        :on-click (fn []
                                    (rf/dispatch-sync [:project/stop-playback])
-                                   (state/add-time! @elt -5))}]
-     [playback-button {:icon-name "navigate_before"
+                                   (state/add-time! elt -5))}]
+     [playback-button {:icon "navigate_before"
                        :on-click (fn []
                                    (rf/dispatch-sync [:project/stop-playback])
-                                   (state/add-time! @elt -0.02))}]
-     [playback-button {:icon-name (if (:play @playback) "pause" "play_arrow")
+                                   (state/add-time! elt -0.02))}]
+     [playback-button {:icon (if (:play @playback) "pause" "play_arrow")
                        :on-click (fn []
                                    (rf/dispatch-sync [:project/toggle-playback]))}]
-     [playback-button {:icon-name "navigate_next"
+     [playback-button {:icon "navigate_next"
                        :on-click (fn []
                                    (rf/dispatch-sync [:project/stop-playback])
-                                   (state/add-time! @elt 0.02))}]
-     [playback-button {:icon-name "forward_5"
+                                   (state/add-time! elt 0.02))}]
+     [playback-button {:icon "forward_5"
                        :on-click (fn []
                                    (rf/dispatch-sync [:project/stop-playback])
-                                   (state/add-time! @elt 5))}]
-     [playback-button {:icon-name "last_page"
+                                   (state/add-time! elt 5))}]
+     [playback-button {:icon "last_page"
                        :on-click (fn []
                                    (rf/dispatch-sync [:project/stop-playback])
-                                   (state/set-time! @elt :end))}]]))
+                                   (state/set-time! elt :end))}]
+     [playback-button {:icon "blank" :style {:visibility "hidden"}}]
+     [play-selection-button]
+     [clear-selection-button]]))
 
 (defn- media-panel-outer []
   (let [playback (rf/subscribe [:project/playback])]
@@ -117,6 +170,12 @@
                loaded (rf/subscribe [:project/loaded])]
     (if @loaded
       [:div
+       #_{:on-key-down ;; doesn't work
+          (fn [e]
+            (js/console.log "detected keypress")
+            (if (and (.ctrlKey e)
+                     (= (.key e) "b"))
+              (js/console.log "CTRL+b detected")))}
        [upper-panel]
        [tiers/tiers]]
       [:div.page-loading

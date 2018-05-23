@@ -14,6 +14,7 @@
    :project/selected-ann-id nil ;; non-nil if selection was formed from ann
    :project/selection-start nil ;; in seconds
    :project/selection-end nil   ;; in seconds
+   :project/selected-tier nil
    ;; contains information about the media being played
    ;; child keys: type, src, play, duration, media-element
    :project/playback {}})
@@ -49,6 +50,7 @@
 (simple-sub :project/selected-ann-id)
 (simple-sub :project/selection-start)
 (simple-sub :project/selection-end)
+(simple-sub :project/selected-tier)
 (simple-sub :project/playback)
 (simple-sub :project/media-element [:project/playback :media-element])
 (simple-sub :project/time [:project/playback :time])
@@ -164,6 +166,25 @@
        :eaf
        eaf30/get-tiers)))
 
+(rf/reg-sub
+ :project/tier-svg-width
+ :<- [:project/current-eaf]
+ (fn [eaf [_ tier-id]]
+   (+ 20
+      (* 10
+         (count (eaf30/get-parent-tiers eaf tier-id))))))
+
+(rf/reg-sub
+ :project/is-parent-tier
+ :<- [:project/current-eaf]
+ (fn [eaf [_ tier-id]]
+   (eaf30/is-parent-tier eaf tier-id)))
+
+(rf/reg-sub
+ :project/is-selected-tier
+ :<- [:project/selected-tier]
+ (fn [selected-id [_ tier-id]]
+   (= selected-id tier-id)))
 
 ;; crosshair and selection subs
 ;; ----------------------------------------------------------------------------
@@ -182,6 +203,14 @@
  (fn [[pps start end] _]
    {:left (* pps start)
     :width (* pps (- end start))}))
+
+;; playback button subs
+(rf/reg-sub
+ :project/playable-selection?
+ :<- [:project/selection-start]
+ :<- [:project/selection-end]
+ (fn [[start end] _]
+   (and start end (> (- end start) 0))))
 
 ;; ----------------------------------------------------------------------------
 ;; events
@@ -298,7 +327,7 @@
  (fn [cofx _]
    (let [viewport-width (.-innerWidth js/window)
          left (find-left-offset
-               (.querySelector js/document ".tier-rows__container"))]
+               (.querySelector js/document ".tier-rows"))]
      (assoc cofx :tier-visual-width (- viewport-width left)))))
 (rf/reg-event-fx
  :project/time-updated
@@ -350,6 +379,11 @@
    (update-in db [:project/playback :play] not)))
 
 (rf/reg-event-db
+ :project/start-playback
+ (fn [db _]
+   (assoc-in db [:project/playback :play] true)))
+
+(rf/reg-event-db
  :project/stop-playback
  (fn [db _]
    (assoc-in db [:project/playback :play] false)))
@@ -385,6 +419,11 @@
    (cond-> db
      (some? start) (assoc :project/selection-start start)
      (some? end) (assoc :project/selection-end end))))
+
+(rf/reg-event-db
+ :project/select-tier
+ (fn [db [_ tier-id]]
+   (assoc db :project/selected-tier tier-id)))
 
 ;; ----------------------------------------------------------------------------
 ;; effects

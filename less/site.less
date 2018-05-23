@@ -116,13 +116,21 @@ div.media-panel__time-container {
 div.media-panel__playback-buttons {
     display: flex;
     justify-content: center;
+    flex-wrap: wrap;
 }
 
 @light-gray: rgba(0,0,0,0.1);
 @tier-height: 32px;
 @tier-label-width: 100px; /* keep in sync with LABEL_WIDTH in tiers.cljs */
 
-div.tier-labels__container {
+div.tiers {
+    width: 100%;
+    position: relative;
+    overflow-x: auto;
+    font-size: 0;
+}
+
+div.tier-labels {
     position: sticky;
     left: 0px;
     width: @tier-label-width;
@@ -132,27 +140,36 @@ div.tier-labels__container {
     z-index: 9001;
 }
 
-div.tier-labels__row:last-child { border-bottom: none; }
-div.tier-labels__row {
+div.tier-label:last-child { border-bottom: none; }
+div.tier-label {
+    display: flex;
+    align-items: center;
     height: @tier-height;
     line-height: @tier-height;
-    text-align: right;
-    font-size: 12px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    user-select: none;
     padding-right: 4px;
     border-right: 1px solid @light-gray;
     border-bottom: 1px solid @light-gray;
 }
+svg.tier-label__pipe {
+    display: flex;
+    stroke: black;
+    stroke-width: 1px;
+}
+div.tier-label__text {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    font-size: 12px;
+}
 
-div.tier-rows__container {
+div.tier-rows {
     vertical-align: baseline;
     display: inline-block;
 }
 
-div.tier-rows__row:last-child { border: none; }
-div.tier-rows__row {
+div.tier-row:last-child { border: none; }
+div.tier-row {
     height: @tier-height;
     line-height: @tier-height;
     border-bottom: 1px solid @light-gray;
@@ -177,7 +194,7 @@ div.selection {
     pointer-events: none;
 }
 
-div.ticks__container {
+div.ticks-row {
     white-space: nowrap;
     display: inline-block;
     position: relative;

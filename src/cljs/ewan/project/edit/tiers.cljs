@@ -20,14 +20,20 @@
   ;; to refer to time-slots without a value
   (let [elt (<sub [:project/media-element])
         t (<sub [:project/ann-begin-time a-ann])
-        id (-> a-ann attrs :annotation-id)]
+        id (-> a-ann attrs :annotation-id)
+        drags (atom 0)]
     [:svg (merge (<sub [:project/ann-svg-attrs a-ann])
                  {:style {:pointer-events "bounding-box"}
+                  :on-mouse-move (fn [e]
+                                   (when (= (.-buttons e) 1)
+                                     (swap! drags + 1)))
                   :on-click (fn [e]
-                              (.stopPropagation e)
-                              (rf/dispatch [:project/stop-playback])
-                              (rf/dispatch [:project/select-ann id])
-                              (state/set-time! elt t))})
+                              (when-not (> @drags 3)
+                                (.stopPropagation e)
+                                (rf/dispatch [:project/stop-playback])
+                                (rf/dispatch [:project/select-ann id])
+                                (state/set-time! elt t))
+                              (reset! drags 0))})
      [:path (merge (<sub [:project/ann-path-attrs a-ann])
                    (<sub [:project/ann-path-color a-ann]))]
      [:text (<sub [:project/ann-text-attrs])
@@ -51,7 +57,7 @@
 
 (defn- tier-row
   [[_ _ & annotations]]
-  [:div.tier-rows__row
+  [:div.tier-row
    [:svg {:width (<sub [:project/tier-width])
           :height (<sub [:project/tier-height])}
     (doall
@@ -60,47 +66,82 @@
        [annotation ann]))]])
 
 (defn- tier-rows [tiers]
-  (r/with-let [start-time (atom nil)]
-    (fn []
-      (let [pps (<sub [:project/px-per-sec])
-            x-to-sec #(/ (- % TIER_CONTENT_OFFSET) pps)
-            offset (<sub [:project/scroll-left])]
-        [:div.tier-rows__container
-         ;; forming selections by dragging is handled here
-         ;; ELAN has more sophisticated control of selection forming
-         ;; for aligned tiers, but this is currently not implemented.
-         ;; Handling of right-to-left drag (which would seem to make
-         ;; a negative selection) is handled in the re-frame event
-         ;; handlers.
-         {:on-mouse-down
-          (fn [e]
-            (reset! start-time nil))
-          :on-mouse-move
-          (fn [e]
-            (.stopPropagation e)
-            (when (= (.-buttons e) 1)
-              (let [t (x-to-sec (+ offset (.-pageX e)))]
-                (state/set-time! (<sub [:project/media-element]) t)
-                (if-not @start-time
-                  (do
-                    (>evt [:project/set-selection t t])
-                    (reset! start-time t))
-                  (if (>= t @start-time)
-                    (>evt [:project/set-selection @start-time t])
-                    (>evt [:project/set-selection t @start-time]))))))}
-         (doall
-          (for [tier @tiers]
-            ^{:key (-> tier attrs :tier-id)}
-            [tier-row tier]))]))))
+  (let [pps (<sub [:project/px-per-sec])
+        x-to-sec #(/ (- % TIER_CONTENT_OFFSET) pps)
+        offset (<sub [:project/scroll-left])
+        start-time (atom nil)]
+    [:div.tier-rows
+     ;; forming selections by dragging is handled here
+     ;; ELAN has more sophisticated control of selection forming
+     ;; for aligned tiers, but this is currently not implemented.
+     ;; Handling of right-to-left drag (which would seem to make
+     ;; a negative selection) is handled in the re-frame event
+     ;; handlers.
+     {:on-mouse-down
+      (fn [e]
+        (reset! start-time nil))
+      :on-mouse-move
+      (fn [e]
+        (.stopPropagation e)
+        (when (= (.-buttons e) 1)
+          (let [t (x-to-sec (+ offset (.-pageX e)))]
+            (state/set-time! (<sub [:project/media-element]) t)
+            (if-not @start-time
+              (do
+                (>evt [:project/set-selection t t])
+                (reset! start-time t))
+              (if (>= t @start-time)
+                (>evt [:project/set-selection @start-time t])
+                (>evt [:project/set-selection t @start-time]))))))
+      :on-mouse-up
+      (fn [e]
+        (when @start-time
+          (.stopPropagation e)))}
+     (doall
+      (for [tier @tiers]
+        ^{:key (-> tier attrs :tier-id)}
+        [tier-row tier]))]))
+
+(defn- tier-label [tier-id]
+  (let [th (<sub [:project/tier-height])
+        half-th (/ th 2)
+        tw (<sub [:project/tier-svg-width tier-id])
+        left (- tw 10)
+        parent-tier (<sub [:project/is-parent-tier tier-id])
+        is-selected (<sub [:project/is-selected-tier tier-id])]
+    [:div.tier-label
+     {:on-double-click
+      (fn [e]
+        (>evt [:project/select-tier tier-id]))}
+     [:svg.tier-label__pipe
+      {:width tw :height th
+       :view-box (str "0 0 " tw " " th)}
+      [:circle {:cx left :cy half-th
+                :r 3 :fill (if is-selected "red" "white")
+                :stroke (if is-selected "red" "black")}]
+      ;; TODO: more helpful pipe structures
+      ;(doall
+      ; (for [x (range left 0 -10)]
+      ;   ^{:key x}
+      ;   [:line {:x1 x :y1 0 :x2 x :y2 th}]))
+      ;(when parent-tier
+      ;  [:line {:x1 left :y1 th :x2 (+ left 10) :y2 th}])
+      ;[:line {:x1 left :x2 (+ left 8)
+      ;        :y1 (/ th 2) :y2 (/ th 2)}]
+      ]
+     [:div.tier-label__text
+      {:style {:font-weight (if is-selected "bold" "normal")
+               :color (if is-selected "red" "black")}}
+      tier-id]]))
 
 (defn- tier-labels [tiers]
-  [:div.tier-labels__container
+  [:div.tier-labels
    {:on-click #(.stopPropagation %)}
    (doall
     (for [tier @tiers]
       (let [tier-id (-> tier attrs :tier-id)]
         ^{:key tier-id}
-        [:div.tier-labels__row tier-id])))])
+        [tier-label tier-id])))])
 
 (defn- crosshair []
   "A line aligned with a certain time that indicates
@@ -142,7 +183,7 @@
    includes buttons for increasing or decreasing pixels per second"
   (let [pps (rf/subscribe [:project/px-per-sec])
         duration (rf/subscribe [:project/duration])]
-    [:div.ticks__container
+    [:div.ticks-row
      [:div.ticks__spacer ;; provides horizontal space in addition to holding the buttons
       [decrease-pps-button]
       [increase-pps-button]]
@@ -155,9 +196,12 @@
            (if (= (mod decisec 10) 0)
              [:g {:key decisec}
               [:line {:x1 x :x2 x :y1 0 :y2 6 :stroke-width 0.5 :stroke "black"}]
-              [:text {:x x :y 16 :font-size 10 :text-anchor "middle" :style {:user-select "none"}}
+              [:text {:x x :y 16 :font-size 10
+                      :text-anchor "middle"
+                      :style {:user-select "none"}}
                (state/time-format sec)]]
-             [:line {:key decisec :x1 x :x2 x :y1 0 :y2 3 :stroke-width 0.5 :stroke "black"}]))))]]))
+             [:line {:key decisec :x1 x :x2 x :y1 0 :y2 3
+                     :stroke-width 0.5 :stroke "black"}]))))]]))
 
 (defn- tiers-inner
   "We need sophisticated handling to allow control of this div's scrollLeft property
@@ -167,8 +211,9 @@
   (r/with-let
     [tiers (rf/subscribe [:project/tiers])
      !div (atom nil)
-     ;; create just one instance of the function that will inform the DB of scroll position
-     ;; and debounce it so it will not fire too often (scroll events fire very quickly)
+     ;; create just one instance of the function that will inform the DB of scroll
+     ;; position and debounce it so it will not fire too often (scroll events fire
+     ;; very quickly)
      handle-scroll (goog.functions.debounce
                     #(>evt [:project/set-scroll-left
                             (-> % .-target .-scrollLeft)])
@@ -186,21 +231,19 @@
       :reagent-render
       (fn []
         [ui/paper
-         {:style {:margin (str MARGIN "px")}}
-         [:div {:style {:width "100%"
-                        :position "relative"
-                        :overflow-x "auto"
-                        :font-size 0}
-                :ref #(reset! !div %)
-                :on-scroll on-scroll
-                :on-click (fn [e]
-                            (>evt [:project/stop-playback])
-                            (state/set-time!
-                             (<sub [:project/media-element])
-                             (/ (+ (-> e .-currentTarget .-scrollLeft)
-                                   (.-pageX e)
-                                   (- TIER_CONTENT_OFFSET))
-                                (<sub [:project/px-per-sec]))))}
+         {:style {:margin (str MARGIN "px")
+                  :min-height "100%"}}
+         [:div.tiers
+          {:ref #(reset! !div %)
+           :on-scroll on-scroll
+           :on-click (fn [e]
+                       (>evt [:project/stop-playback])
+                       (state/set-time!
+                        (<sub [:project/media-element])
+                        (/ (+ (-> e .-currentTarget .-scrollLeft)
+                              (.-pageX e)
+                              (- TIER_CONTENT_OFFSET))
+                           (<sub [:project/px-per-sec]))))}
           [ticks]
           [:div {:style {:white-space "nowrap"
                          :display "inline-block"}}
