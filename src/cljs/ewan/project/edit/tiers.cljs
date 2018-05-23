@@ -6,6 +6,7 @@
             [cljs-react-material-ui.icons :as ic]
             [ewan.common :refer [tag-name attrs first-child children <sub >evt]]
             [ewan.project.edit.state :as state]
+            [ewan.project.edit.annotation-edit-dialog :refer [annotation-edit-dialog]]
             [reagent.core :as r]
             [goog.functions]))
 
@@ -33,7 +34,9 @@
                                 (rf/dispatch [:project/stop-playback])
                                 (rf/dispatch [:project/select-ann id])
                                 (state/set-time! elt t))
-                              (reset! drags 0))})
+                              (reset! drags 0))
+                  :on-double-click (fn [e]
+                                     (>evt [:project/open-ann-edit-dialog id]))})
      [:path (merge (<sub [:project/ann-path-attrs a-ann])
                    (<sub [:project/ann-path-color a-ann]))]
      [:text (<sub [:project/ann-text-attrs])
@@ -134,6 +137,16 @@
                :color (if is-selected "red" "black")}}
       tier-id]]))
 
+(defn- add-tier-button []
+  [:div.tier-label--add-button
+   [ui/flat-button {:style {:width "100%"
+                            :height "100%"}
+                    :hover-color "#d3ffea"
+                    :ripple-color "#00ff84"
+                    :icon (r/as-element
+                           [ui/font-icon {:class-name "material-icons"}
+                            "add"])}]])
+
 (defn- tier-labels [tiers]
   [:div.tier-labels
    {:on-click #(.stopPropagation %)}
@@ -141,7 +154,8 @@
     (for [tier @tiers]
       (let [tier-id (-> tier attrs :tier-id)]
         ^{:key tier-id}
-        [tier-label tier-id])))])
+        [tier-label tier-id])))
+   [add-tier-button]])
 
 (defn- crosshair []
   "A line aligned with a certain time that indicates
@@ -256,4 +270,6 @@
   "See https://github.com/Day8/re-frame/blob/master/docs/Using-Stateful-JS-Components.md"
   (let [scroll-left (rf/subscribe [:project/scroll-left])]
     (fn []
-      [tiers-inner {:scroll-left @scroll-left}])))
+      [:div
+       [tiers-inner {:scroll-left @scroll-left}]
+       [annotation-edit-dialog]])))
