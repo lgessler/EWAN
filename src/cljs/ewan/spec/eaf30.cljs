@@ -628,12 +628,14 @@
 (defzipfn get-version z/node attrs :version)
 
 (defn get-licenses
+  "Returns a seq of all license elements"
   [hiccup]
   (-> hiccup
       go-to-licenses
       (take-right-to-last :license)))
 
 (defn get-media-descriptors
+  "Returns a seq of all media-descriptor elements (under the header element)"
   [hiccup]
   (-> hiccup
       go-to-header
@@ -641,6 +643,7 @@
       (take-right-to-last :media-descriptor)))
 
 (defn get-properties
+  "Returns a seq of all property elements (under the header element)"
   [hiccup]
   (-> hiccup
       go-to-header
@@ -649,14 +652,34 @@
       (take-right-to-last :property)))
 
 (defn get-tiers
+  "Returns a seq of all tier elements"
   [hiccup]
   (-> hiccup
       go-to-tiers
       (take-right-to-last :tier)))
 
-;; NYI: get-* for linguistic types, locales, languages, etc.
+(defn get-locales
+  "Returns a seq of all locales"
+  [hiccup]
+  (-> hiccup
+      go-to-locales
+      (take-right-to-last :locale)))
 
+(defn get-linguistic-types
+  "Returns a seq of all linguistic types"
+  [hiccup]
+  (-> hiccup
+      go-to-linguistic-types
+      (take-right-to-last :linguistic-type)))
 
+(defn get-controlled-vocabularies
+  "Returns a seq of all controlled vocabularies"
+  [hiccup]
+  (-> hiccup
+      go-to-controlled-vocabularies
+      (take-right-to-last :controlled-vocabulary)))
+
+;; NYI: get-* for some top-level elements like :constraint
 
 ;; derived data structures and cache
 ;; ----------------------------------------------------------------------------
@@ -668,7 +691,7 @@
 ;; with the other keys in `*cache*`.
 ;;
 ;; Functions that rely on derived structures call functions which are
-;; prefixed with `build-`. These functions check to see if the hiccup
+;; suffixed with `map-`. These functions check to see if the hiccup
 ;; they're given matches `:latest-doc` and then either just return
 ;; the cached derived structure if it's the same, or build a new version
 ;; if it's different and set the appropriate var.
@@ -676,10 +699,6 @@
 ;; From an external perspective, this approach is still functionally
 ;; pure and preserves referential transparency. It just gets us a
 ;; performance win a lot of the time.
-
-(def ^:private *cache* {:latest-doc nil
-                        :annotation-map nil
-                        :tier-parent-map nil})
 
 (defn get-time-slot-val [hiccup time-slot-id]
   "Determine the millisecond value of a time slot ID."
@@ -709,11 +728,7 @@
                      (int right-neighbor-val))
                   2))))))
 
-(defn- build-annotation-map [hiccup]
-  "Returns a seq of elements that each corresponds to an annotation. A map
-   is returned with the keys:
-    :ref            if the annotation is a reference annotation
-    :time1, :time2  if the annotation is an alignable annotation"
+(defn- annotation-map [hiccup]
   (into
    {}
    (for [tier (get-tiers hiccup)
@@ -723,39 +738,75 @@
            {:keys [:annotation-id
                    :annotation-ref
                    :time-slot-ref1
-                   :time-slot-ref2]} (attrs inner-ann)]
+                   :time-slot-ref2]} (attrs inner-ann)
+           tier-id (-> tier attrs :tier-id)]
        [annotation-id
-        (if annotation-ref
-          {:ref annotation-ref}
-          {:time1 (get-time-slot-val hiccup time-slot-ref1)
-           :time2 (get-time-slot-val hiccup time-slot-ref2)})]))))
+        (merge {:tier-id tier-id}
+               (if annotation-ref
+                 {:ref annotation-ref}
+                 {:time1 (get-time-slot-val hiccup time-slot-ref1)
+                  :time2 (get-time-slot-val hiccup time-slot-ref2)}))]))))
 
-(defn- build-tier-parent-map
-  "map from tier-id's to parent-refs, e.g.:
-    [:tier {:tier-id \"Foo\" :parent-ref \"Bar\"}]
-    ->
-    {..., \"Foo\" \"Bar\", ...}"
+(defn- tier-map
+  "map from tier-id's to information about the tier"
   [hiccup]
   (into {}
-        (for [a (map attrs (get-tiers hiccup))]
-          (when (:parent-ref a)
-            [(:tier-id a) (:parent-ref a)]))))
+        (for [{:keys [tier-id parent-ref linguistic-type-ref]}
+              (map attrs (get-tiers hiccup))]
+          [tier-id {:parent-ref parent-ref
+                    :linguistic-type-ref linguistic-type-ref}])))
+
+(defn- linguistic-type-map
+  "map from linguistic type id's to information about the type"
+  [hiccup]
+  (into {}
+        (for [{:keys [linguistic-type-id
+                      time-alignable
+                      constraints
+                      controlled-vocabulary-ref]}
+              (map attrs (get-linguistic-types hiccup))]
+          [linguistic-type-id {:time-alignable time-alignable
+                               :constraints constraints
+                               :controlled-vocabulary-ref controlled-vocabulary-ref}])))
+
+(defn- controlled-vocabulary-map
+  "map from controlled vocabulary id's to information about the cv"
+  [hiccup]
+  (into {}
+        (for [cv (get-controlled-vocabularies hiccup)]
+          (let [id (-> cv attrs :cv-id)
+                entries (map (fn [[_ {:keys [description]} value]]
+                               {:description description
+                                :value value})
+                             (children cv))]
+            [id entries]))))
+
+(def ^:private *cache* {:latest-doc nil
+                        :annotation-map nil
+                        :tier-parent-map nil
+                        :linguistic-type-map nil
+                        :controlled-vocabulary-map nil})
 
 (defn- update-cache!
   [hiccup]
   (set! *cache* {:latest-doc hiccup
-                 :annotation-map (build-annotation-map hiccup)
-                 :tier-parent-map (build-tier-parent-map hiccup)}))
+                 :annotation-map (annotation-map hiccup)
+                 :tier-map (tier-map hiccup)
+                 :linguistic-type-map (linguistic-type-map hiccup)
+                 :controlled-vocabulary-map (controlled-vocabulary-map hiccup)}))
 
-(defn- build-annotation-map-cached [hiccup]
-  (when-not (= (:latest-doc *cache*) hiccup)
-    (update-cache! hiccup))
-  (:annotation-map *cache*))
+(defn- make-cached
+  [ckey]
+  (fn [hiccup]
+    (when-not (= (:latest-doc *cache*) hiccup)
+      (update-cache! hiccup))
+    (ckey *cache*)))
 
-(defn- build-tier-parent-map-cached [hiccup]
-  (when-not (= (:latest-doc *cache*) hiccup)
-    (update-cache! hiccup))
-  (:tier-parent-map *cache*))
+(def ^:private annotation-map-cached (make-cached :annotation-map))
+(def ^:private tier-map-cached (make-cached :tier-map))
+(def ^:private linguistic-type-map-cached (make-cached :linguistic-type-map))
+(def ^:private controlled-vocabulary-map-cached (make-cached :controlled-vocabulary-map))
+
 
 ;; More involved getters and setters
 ;; ----------------------------------------------------------------------------
@@ -765,7 +816,7 @@
    times are recursively resolved."
   [hiccup ann-id]
   (let [{:keys [ref] :as m}
-        (get (build-annotation-map-cached hiccup) ann-id)]
+        (get (annotation-map-cached hiccup) ann-id)]
     (if ref
       (recur hiccup ref)
       m)))
@@ -773,11 +824,11 @@
 (defn get-parent-tiers
   "Given a tier ID, return a seq of parent tiers"
   [hiccup tier-id]
-  (let [parents (build-tier-parent-map-cached hiccup)
+  (let [tiers (tier-map-cached hiccup)
         inner (fn inner [id]
-                (let [parent (get parents id)]
-                  (if parent
-                    (cons parent (inner parent))
+                (let [{:keys [parent-ref]} (get tiers id)]
+                  (if parent-ref
+                    (cons parent-ref (inner parent-ref))
                     nil)))]
     (inner tier-id)))
 
@@ -785,17 +836,32 @@
   "Given a tier ID, return true if there are other tiers
    that refer to it with :parent-ref; nil otherwise"
   [hiccup tier-id]
-  (some (fn [[child parent]]
-          (= parent tier-id))
-        (build-tier-parent-map-cached hiccup)))
+  (some (fn [[child {:keys [parent-ref]}]]
+          (= parent-ref tier-id))
+        (tier-map-cached hiccup)))
 
+(defn get-tier-of-ann
+  "Returns the ID of the tier that holds the annotation, or nil
+   if the annotation doesn't exist"
+  [hiccup ann-id]
+  (let [map (annotation-map-cached hiccup)]
+    (some-> (get map ann-id)
+            :tier-id)))
 
+(defn has-controlled-vocabulary
+  "True if the tier has a linguistic type that references
+   a controlled vocabulary, indicating that the tier's annotations
+   are not in freetext; false otherwise"
+  [hiccup tier-id]
+  (let [lt-id (-> (tier-map-cached hiccup)
+                  (get tier-id)
+                  (:linguistic-type-ref))
+        lt (-> (linguistic-type-map-cached hiccup)
+               (get lt-id))]
+    (some? (:controlled-vocabulary-ref lt))))
 
 ;(def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
 
+;(annotation-map-cached *eaf)
 
-
-;(build-tier-inheritance-map *eaf)
-
-
-
+;(tier-inheritance-map *eaf)
