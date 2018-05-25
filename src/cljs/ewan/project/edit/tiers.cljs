@@ -36,7 +36,8 @@
                                 (state/set-time! elt t))
                               (reset! drags 0))
                   :on-double-click (fn [e]
-                                     (>evt [:project/open-ann-edit-dialog id]))})
+                                     (.stopPropagation e) ;; don't send to tier
+                                     (>evt [:project/open-ann-edit-dialog {:ann-id id}]))})
      [:path (merge (<sub [:project/ann-path-attrs a-ann])
                    (<sub [:project/ann-path-color a-ann]))]
      [:text (<sub [:project/ann-text-attrs])
@@ -59,10 +60,11 @@
     nil))
 
 (defn- tier-row
-  [[_ _ & annotations]]
+  [[_ {:keys [tier-id]} & annotations]]
   [:div.tier-row
    [:svg {:width (<sub [:project/tier-width])
-          :height (<sub [:project/tier-height])}
+          :height (<sub [:project/tier-height])
+          :on-double-click #(>evt [:project/open-ann-edit-dialog {:tier-id tier-id}])}
     (doall
      (for [ann annotations]
        ^{:key (-> ann first-child attrs :annotation-id)}

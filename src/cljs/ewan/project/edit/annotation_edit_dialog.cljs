@@ -15,16 +15,19 @@
 ;; this state needs to be in re-frame so that consuming components can tell the
 ;; dialog to open itself
 (def ^:private default-db {:project/ann-edit-dialog-open false
-                           :project/editing-ann-id nil})
+                           :project/editing-ann-id nil
+                           :project/tier-for-new-ann nil})
 
 (simple-sub :project/ann-edit-dialog-open)
 (simple-sub :project/editing-ann-id)
+(simple-sub :project/tier-for-new-ann)
 
 (rf/reg-event-db
  :project/open-ann-edit-dialog
- (fn [db [_ ann-id]]
+ (fn [db [_ {:keys [tier-id ann-id]}]]
    (-> db
        (assoc :project/ann-edit-dialog-open true)
+       (assoc :project/tier-for-new-ann tier-id)
        (assoc :project/editing-ann-id ann-id))))
 
 (rf/reg-event-db
@@ -32,6 +35,7 @@
  (fn [db _]
    (-> db
        (assoc :project/ann-edit-dialog-open false)
+       (assoc :project/tier-for-new-ann nil)
        (assoc :project/editing-ann-id nil))))
 
 (rf/reg-event-db
@@ -42,12 +46,13 @@
 (rf/reg-event-db
  :project/edit-annotation
  (fn [db [_ v]]
-   (let [ann-id (:project/selected-ann-id db)
+   (let [ann-id (:project/editing-ann-id db)
          eaf (get-in db [:project/current-project :eaf])]
      (assoc-in db
                [:project/current-project :eaf]
                (eaf30/edit-annotation eaf ann-id v)))))
 
+;; TODO
 (rf/reg-event-db
  :project/create-annotation
  (fn [db [_ v]]
@@ -116,9 +121,10 @@
                       :primary-text (:description entry)}])]))
 
 (defn- form [state ann-id]
-  [:form#annotation-edit-form {:on-submit (fn [e]
-                                            (.preventDefault e)
-                                            (submit state))}
+  [:form#annotation-edit-form
+   {:on-submit (fn [e]
+                 (.preventDefault e)
+                 (submit state))}
    (if (<sub [:project/ann-uses-cv])
      [cv-value-field state]
      [freetext-value-field state])])
@@ -142,9 +148,11 @@
     (fn []
       (let [open (or (<sub [:project/ann-edit-dialog-open]) false)
             ann-id (<sub [:project/editing-ann-id])
+            tier-id (<sub [:project/tier-for-new-ann])
             default-value (<sub [:project/ann-value-from-id ann-id])
             state (r/atom {:value default-value
-                           :ann-id ann-id})]
+                           :ann-id ann-id
+                           :tier-id tier-id})]
         [ui/dialog {:title (if ann-id "Edit Annotation" "Create Annotation")
                     :open open
                     :actions (r/as-element (actions (some? ann-id)))
