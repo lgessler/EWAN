@@ -6,7 +6,8 @@
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]
             [cljs-react-material-ui.icons :as ic]
-            [reagent.core :as r]))
+            [reagent.core :as r]
+            [clojure.walk :as w]))
 
 
 
@@ -38,7 +39,100 @@
  (fn [db _]
    (merge db default-db)))
 
+(rf/reg-event-db
+ :project/edit-annotation
+ (fn [db [_ v]]
+   (let [ann-id (:project/selected-ann-id db)
+         eaf (get-in db [:project/current-project :eaf])]
+     (assoc-in db
+               [:project/current-project :eaf]
+               (eaf30/edit-annotation eaf ann-id v)))))
+
+(rf/reg-event-db
+ :project/create-annotation
+ (fn [db [_ v]]
+   db))
+
+(rf/reg-sub
+ :project/cv-entries
+ :<- [:project/current-eaf]
+ (fn [eaf [_ ann-id]]
+   (eaf30/get-controlled-vocabulary-entries
+    eaf
+    (eaf30/get-tier-of-ann eaf ann-id))))
+
+(rf/reg-sub
+ :project/ann-value-from-id
+ :<- [:project/current-eaf]
+ (fn [eaf [_ ann-id]]
+   (eaf30/get-annotation-value eaf ann-id)))
+
+(rf/reg-sub
+ :project/ann-uses-cv
+ :<- [:project/current-eaf]
+ :<- [:project/editing-ann-id]
+ :<- [:project/selected-tier]
+ (fn [[eaf ann-id selected-tier-id] _]
+   (if ann-id
+     (let [tier-id (eaf30/get-tier-of-ann eaf ann-id)]
+       (eaf30/has-controlled-vocabulary eaf tier-id))
+     (eaf30/has-controlled-vocabulary eaf selected-tier-id))))
+
 ;; -- the rest -----------------------------------------------------------------
+
+(defn- submit
+  [state]
+  (let [ann-id (:ann-id @state)]
+    (>evt [:project/close-ann-edit-dialog])
+    (if ann-id
+      (>evt [:project/edit-annotation (:value @state)])
+      (>evt [:project/create-annotation (:value @state)]))))
+
+(defn- freetext-value-field
+  [state]
+  [:div
+   [:label {:for "annotation-edit-value-field"} "Annotation value"]
+   [ui/text-field
+    {:id "annotation-edit-value-field"
+     :auto-focus "autofocus"
+     :full-width true
+     :floating-label-fixed true
+     :default-value (:value @state)
+     :on-change (fn [_ v] (swap! state assoc :value v))}]])
+
+(defn- cv-value-field
+  [state]
+  (let [cv-entries (<sub [:project/cv-entries (:ann-id @state)])]
+    [ui/select-field
+     {:floating-label-text "Annotation value"
+      :full-width true
+      :floating-label-fixed true
+      :value (:value @state)
+      :on-change (fn [_ v]
+                   (swap! state assoc :value (:value (nth cv-entries v))))}
+     (for [entry cv-entries]
+       [ui/menu-item {:key (:value entry)
+                      :value (:value entry)
+                      :primary-text (:description entry)}])]))
+
+(defn- form [state ann-id]
+  [:form#annotation-edit-form {:on-submit (fn [e]
+                                            (.preventDefault e)
+                                            (submit state))}
+   (if (<sub [:project/ann-uses-cv])
+     [cv-value-field state]
+     [freetext-value-field state])])
+
+(defn- actions [editing]
+  #js[(r/as-element
+       [ui/flat-button {:label (if editing "Save" "Create")
+                        :primary true
+                        :type "submit"
+                        :form "annotation-edit-form"}])
+      (r/as-element
+       [ui/flat-button {:label "Cancel"
+                        :primary false
+                        :on-click #(>evt [:project/close-ann-edit-dialog])}])])
 
 (defn annotation-edit-dialog
   []
@@ -47,9 +141,12 @@
     :reagent-render
     (fn []
       (let [open (or (<sub [:project/ann-edit-dialog-open]) false)
-            ann-id (<sub [:project/editing-ann-id])]
-        [ui/dialog {:title (if ann-id
-                             "Edit annotation"
-                             "Create annotation")
+            ann-id (<sub [:project/editing-ann-id])
+            default-value (<sub [:project/ann-value-from-id ann-id])
+            state (r/atom {:value default-value
+                           :ann-id ann-id})]
+        [ui/dialog {:title (if ann-id "Edit Annotation" "Create Annotation")
                     :open open
-                    :on-request-close #(>evt [:project/close-ann-edit-dialog])}]))}))
+                    :actions (r/as-element (actions (some? ann-id)))
+                    :on-request-close #(>evt [:project/close-ann-edit-dialog])}
+         [form state ann-id]]))}))

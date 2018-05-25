@@ -4,7 +4,8 @@
             [cljs-time.format :as timefmt]
             [cljs.pprint :refer [pprint]]
             [clojure.string :as string]
-            [clojure.zip :as z])
+            [clojure.zip :as z]
+            [cljs.pprint :as pprint])
   (:require-macros [cljs.spec.alpha :as s]
                    [ewan.spec.eaf30 :refer [defzipfn
                                             defzipfn-]]))
@@ -545,8 +546,12 @@
 
 (defn- children
   [hiccup]
-  (if-not (map? (second hiccup))
+  (cond
+    (nil? hiccup)
+    nil
+    (not (map? (second hiccup)))
     (js/Error. "EAF hiccup must have an attrs map, even if it is empty.")
+    :else
     (drop 2 hiccup)))
 
 (defn- hiccup-zipper
@@ -604,7 +609,7 @@
   [loc kwd]
   (take-right-while loc #(= (tag-name %) kwd)))
 
-;; Trivial getters and setters
+;; Trivial getters and `go-to` functions
 ;; ----------------------------------------------------------------------------
 ;; defzipfn is a macro that generates something like this:
 ;; (defn <name> [hiccup] (-> hiccup hiccup-zipper <arg1> <arg2> ...))
@@ -622,6 +627,8 @@
 (defzipfn- go-to-controlled-vocabularies z/down (right-to-first :controlled-vocabulary))
 (defzipfn- go-to-lexicon-refs z/down (right-to-first :lexicon-ref))
 (defzipfn- go-to-external-refs z/down (right-to-first :external-ref))
+
+
 
 (defzipfn get-date z/node attrs :date)
 (defzipfn get-author z/node attrs :author)
@@ -741,7 +748,8 @@
                    :time-slot-ref2]} (attrs inner-ann)
            tier-id (-> tier attrs :tier-id)]
        [annotation-id
-        (merge {:tier-id tier-id}
+        (merge {:tier-id tier-id
+                :value (-> inner-ann children first children first)}
                (if annotation-ref
                  {:ref annotation-ref}
                  {:time1 (get-time-slot-val hiccup time-slot-ref1)
@@ -808,7 +816,7 @@
 (def ^:private controlled-vocabulary-map-cached (make-cached :controlled-vocabulary-map))
 
 
-;; More involved getters and setters
+;; More involved getters
 ;; ----------------------------------------------------------------------------
 (defn get-annotation-times
   "Returns a map with keys :time1 :time2 representing the millisecond time
@@ -820,6 +828,13 @@
     (if ref
       (recur hiccup ref)
       m)))
+
+(defn get-annotation-value
+  "Returns the value of an annotation"
+  [hiccup ann-id]
+  (-> (annotation-map-cached hiccup)
+      (get ann-id)
+      :value))
 
 (defn get-parent-tiers
   "Given a tier ID, return a seq of parent tiers"
@@ -860,8 +875,56 @@
                (get lt-id))]
     (some? (:controlled-vocabulary-ref lt))))
 
+(defn get-controlled-vocabulary-entries
+  "Given a TIER id, returns a seq of all the entries under the
+   controlled vocabulary that is referenced by the linguistic
+   type of the tier. Each entry of the seq has keys :value
+   and :description."
+  [hiccup tier-id]
+  (let [lt-id (-> (tier-map-cached hiccup)
+                  (get tier-id)
+                  :linguistic-type-ref)
+        cv-id (-> (linguistic-type-map-cached hiccup)
+                  (get lt-id)
+                  :controlled-vocabulary-ref)]
+    (get (controlled-vocabulary-map-cached hiccup) cv-id)))
+
+
+
+;; setters
+;; ----------------------------------------------------------------------------
+(defn- go-to-annotation
+  "Returns a zipper that has been taken to the annotation element
+   with the given ID. Note that this does not return the outer
+   :annotation element. It returns the element with the actual ID
+   on it, i.e. an :alignable-annotation or a :ref-annotation"
+  [hiccup ann-id]
+  (let [tier-id (get-tier-of-ann hiccup ann-id)]
+    (-> (go-to-tiers hiccup)
+        (right-while #(not= (-> % attrs :tier-id) tier-id))
+        z/down
+        (right-while #(not= (-> %
+                                children
+                                first
+                                attrs
+                                :annotation-id) ann-id))
+        z/down)))
+
+(defn edit-annotation
+  "Replaces the inner text of the :annotation-value node for a
+   given annotation and returns the resulting :annotation-document"
+  [hiccup ann-id new-value]
+  (let [ann (go-to-annotation hiccup ann-id)]
+    (-> ann
+        z/down
+        z/down
+        (z/replace new-value)
+        z/root)))
+
 ;(def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
 
-;(annotation-map-cached *eaf)
 
-;(tier-inheritance-map *eaf)
+
+
+
+

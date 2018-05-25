@@ -17,8 +17,7 @@
    :project/selected-tier nil
    ;; contains information about the media being played
    ;; child keys: type, src, play, duration, media-element
-   :project/playback {}
-   :project/annotation-edit-dialog-open false})
+   :project/playback {}})
 
 ;; if you change these, be sure to change the LESS variable as well
 (def ^:private TIER_HEIGHT 32)
@@ -57,7 +56,6 @@
 (simple-sub :project/time [:project/playback :time])
 (simple-sub :project/duration [:project/playback :duration])
 (simple-sub :project/current-eaf [:project/current-project :eaf])
-(simple-sub :project/annotation-edit-dialog-open)
 
 
 (rf/reg-sub
@@ -427,17 +425,6 @@
  :project/select-tier
  (fn [db [_ tier-id]]
    (assoc db :project/selected-tier tier-id)))
-
-;; dialogs
-(rf/reg-event-db
- :project/open-annotation-edit-dialog
- (fn [db _]
-   (assoc db :annotation-edit-dialog-open true)))
-
-(rf/reg-event-db
- :project/close-annotation-edit-dialog
- (fn [db _]
-   (assoc db :annotation-edit-dialog-open false)))
 
 ;; ----------------------------------------------------------------------------
 ;; effects
