@@ -10,7 +10,7 @@ This will be an experimental port of a minimal feature-subset of [ELAN](https://
 
 ☑️ Read-only display and playback of ELAN files
 
-☑️ Offline editing and saving of projects
+☑️ Offline operation
 
 ☐ Export to ELAN files
 
