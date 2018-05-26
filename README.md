@@ -26,6 +26,10 @@ This will be an experimental port of a minimal feature-subset of [ELAN](https://
 
 # Building
 
+## Install Clojure and Leiningen
+
+[Clojure](https://clojure.org/guides/getting_started#_clojure_installer_and_cli_tools), [Leiningen](https://github.com/technomancy/leiningen)
+
 ## Compile css:
 
 ```sh
