@@ -6,17 +6,23 @@ This will be an experimental port of a minimal feature-subset of [ELAN](https://
 
 ☑️ Translate [EAF XSD](http://www.mpi.nl/tools/elan/EAFv3.0.xsd) into a Clojure [spec](https://clojure.org/guides/spec)
 
+☑️ Import of ELAN files
+
+☑️ Read-only display and playback of ELAN files
+
+☑️ Offline editing and saving of projects
+
+☐ Export to ELAN files
+
 ☐ Support for most basic ELAN workflows
 
-☐ Export and import of EAF
-
-☐ Full ELAN functionality coverage
-
-☐ Remote syncing of projects (this also entails accounts and auth)
+☐ Remote syncing of projects
 
 ☐ Live collaborative editing *à la* Google Docs
 
-☐ Plugin system letting users write custom scripts
+☐ Plugin API letting users write custom scripts in plain JavaScript
+
+☐ Full ELAN functionality coverage
 
 # Building
 
