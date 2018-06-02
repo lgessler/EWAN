@@ -5,8 +5,10 @@
             [cljs.pprint :refer [pprint]]
             [clojure.string :as string]
             [clojure.zip :as z]
-            [cljs.pprint :as pprint])
+            [cljs.pprint :as pprint]
+            [cljs.test])
   (:require-macros [cljs.spec.alpha :as s]
+                   [cljs.test :refer [is]]
                    [ewan.spec.eaf30 :refer [defzipfn
                                             defzipfn-]]))
 
@@ -211,7 +213,7 @@
 (s/def ::annotation-value
   (s/cat :tag #(= % :annotation-value)
          :attrs map?
-         :contents string?))
+         :contents (s/? string?)))
 
 (s/def ::alignable-annotation
   (s/cat :tag #(= % :alignable-annotation)
@@ -735,7 +737,8 @@
                      (int right-neighbor-val))
                   2))))))
 
-(defn- annotation-map [hiccup]
+(defn- annotation-map-uncached
+  [hiccup]
   (into
    {}
    (for [tier (get-tiers hiccup)
@@ -755,7 +758,7 @@
                  {:time1 (get-time-slot-val hiccup time-slot-ref1)
                   :time2 (get-time-slot-val hiccup time-slot-ref2)}))]))))
 
-(defn- tier-map
+(defn- tier-map-uncached
   "map from tier-id's to information about the tier"
   [hiccup]
   (into {}
@@ -764,7 +767,7 @@
           [tier-id {:parent-ref parent-ref
                     :linguistic-type-ref linguistic-type-ref}])))
 
-(defn- linguistic-type-map
+(defn- linguistic-type-map-uncached
   "map from linguistic type id's to information about the type"
   [hiccup]
   (into {}
@@ -777,7 +780,7 @@
                                :constraints constraints
                                :controlled-vocabulary-ref controlled-vocabulary-ref}])))
 
-(defn- controlled-vocabulary-map
+(defn- controlled-vocabulary-map-uncached
   "map from controlled vocabulary id's to information about the cv"
   [hiccup]
   (into {}
@@ -797,11 +800,16 @@
 
 (defn- update-cache!
   [hiccup]
-  (set! *cache* {:latest-doc hiccup
-                 :annotation-map (annotation-map hiccup)
-                 :tier-map (tier-map hiccup)
-                 :linguistic-type-map (linguistic-type-map hiccup)
-                 :controlled-vocabulary-map (controlled-vocabulary-map hiccup)}))
+  (set! *cache* {:latest-doc
+                 hiccup
+                 :annotation-map
+                 (annotation-map-uncached hiccup)
+                 :tier-map
+                 (tier-map-uncached hiccup)
+                 :linguistic-type-map
+                 (linguistic-type-map-uncached hiccup)
+                 :controlled-vocabulary-map
+                 (controlled-vocabulary-map-uncached hiccup)}))
 
 (defn- make-cached
   [ckey]
@@ -810,10 +818,10 @@
       (update-cache! hiccup))
     (ckey *cache*)))
 
-(def ^:private annotation-map-cached (make-cached :annotation-map))
-(def ^:private tier-map-cached (make-cached :tier-map))
-(def ^:private linguistic-type-map-cached (make-cached :linguistic-type-map))
-(def ^:private controlled-vocabulary-map-cached (make-cached :controlled-vocabulary-map))
+(def ^:private annotation-map (make-cached :annotation-map))
+(def ^:private tier-map (make-cached :tier-map))
+(def ^:private linguistic-type-map (make-cached :linguistic-type-map))
+(def ^:private controlled-vocabulary-map (make-cached :controlled-vocabulary-map))
 
 
 ;; More involved getters
@@ -824,7 +832,7 @@
    times are recursively resolved."
   [hiccup ann-id]
   (let [{:keys [ref] :as m}
-        (get (annotation-map-cached hiccup) ann-id)]
+        (get (annotation-map hiccup) ann-id)]
     (if ref
       (recur hiccup ref)
       m)))
@@ -832,14 +840,14 @@
 (defn get-annotation-value
   "Returns the value of an annotation"
   [hiccup ann-id]
-  (-> (annotation-map-cached hiccup)
+  (-> (annotation-map hiccup)
       (get ann-id)
       :value))
 
 (defn get-parent-tiers
   "Given a tier ID, return a seq of parent tiers"
   [hiccup tier-id]
-  (let [tiers (tier-map-cached hiccup)
+  (let [tiers (tier-map hiccup)
         inner (fn inner [id]
                 (let [{:keys [parent-ref]} (get tiers id)]
                   (if parent-ref
@@ -853,13 +861,13 @@
   [hiccup tier-id]
   (some (fn [[child {:keys [parent-ref]}]]
           (= parent-ref tier-id))
-        (tier-map-cached hiccup)))
+        (tier-map hiccup)))
 
 (defn get-tier-of-ann
   "Returns the ID of the tier that holds the annotation, or nil
    if the annotation doesn't exist"
   [hiccup ann-id]
-  (let [map (annotation-map-cached hiccup)]
+  (let [map (annotation-map hiccup)]
     (some-> (get map ann-id)
             :tier-id)))
 
@@ -868,10 +876,10 @@
    a controlled vocabulary, indicating that the tier's annotations
    are not in freetext; false otherwise"
   [hiccup tier-id]
-  (let [lt-id (-> (tier-map-cached hiccup)
+  (let [lt-id (-> (tier-map hiccup)
                   (get tier-id)
                   (:linguistic-type-ref))
-        lt (-> (linguistic-type-map-cached hiccup)
+        lt (-> (linguistic-type-map hiccup)
                (get lt-id))]
     (some? (:controlled-vocabulary-ref lt))))
 
@@ -881,13 +889,13 @@
    type of the tier. Each entry of the seq has keys :value
    and :description."
   [hiccup tier-id]
-  (let [lt-id (-> (tier-map-cached hiccup)
+  (let [lt-id (-> (tier-map hiccup)
                   (get tier-id)
                   :linguistic-type-ref)
-        cv-id (-> (linguistic-type-map-cached hiccup)
+        cv-id (-> (linguistic-type-map hiccup)
                   (get lt-id)
                   :controlled-vocabulary-ref)]
-    (get (controlled-vocabulary-map-cached hiccup) cv-id)))
+    (get (controlled-vocabulary-map hiccup) cv-id)))
 
 
 
@@ -921,7 +929,87 @@
         (z/replace new-value)
         z/root)))
 
+(defn- incr-ann-id
+  "Given a string like \"a99\", returns \"a100\". The returned string always
+   begins with \"a\", even if an \"a\" was not present in the provided string.
+   If the provided string does not have an identifiable sequence of numbers,
+   \"a1\" is returned."
+  [ann-id]
+  (->> ann-id
+       (re-find #"\d+")
+       int              ;; (int nil) => 0
+       inc
+       (str "a")))
+
+(defn- next-annotation-id
+  [hiccup]
+  (let [last-id (some->> hiccup
+                         annotation-map
+                         keys
+                         (sort #(compare (int (re-find #"\d+" %1))
+                                         (int (re-find #"\d+" %2))))
+                         last)
+        ann-map (annotation-map hiccup)]
+    (if (nil? last-id)
+      "a1"
+      (loop [next-id last-id]
+        (if (nil? (get ann-map next-id))
+          next-id
+          (recur (incr-ann-id next-id)))))))
+
+
+
+(defn- insert-ref-annotation
+  [hiccup tier-id ann-id ref-id value]
+  hiccup)
+
+(defn- insert-alignable-annotation
+  [hiccup tier-id ann-id start-time end-time value]
+  hiccup)
+
+(defn insert-annotation
+  [hiccup {:keys [tier-id value
+                  start-time end-time
+                  ref-id]}]
+  ;; todo: add more preconditions
+  {:pre [(is (some? tier-id))
+         (is (or (and (number? start-time)
+                      (number? end-time))
+                 (string? ref-id))
+             (str "You must provide either a :start-time and :end-time"
+                  " (for an alignable annotation) or a :ref-id "
+                  " (for a ref annotation)"))
+         (is (not (nil? (get (tier-map hiccup) tier-id)))
+             (str "Attempted to create annotation on tier \""
+                  tier-id "\", which does not exist"))]
+   :post [(s/valid? ::annotation-document %)]}
+  (let [ann-id (next-annotation-id hiccup)]
+    (if (some? ref-id)
+      (insert-ref-annotation hiccup tier-id ann-id ref-id value)
+      (insert-alignable-annotation hiccup tier-id ann-id start-time end-time value))))
+
 ;(def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
