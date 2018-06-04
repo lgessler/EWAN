@@ -67,6 +67,7 @@
 
     {:id           "min"
      :source-paths ["src/cljs"]
+     :assert       false
      :compiler     {:main            ewan.core
                     :output-to       "resources/public/js/compiled/app.js"
                     :optimizations   :advanced
