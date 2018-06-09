@@ -6,7 +6,8 @@
             [clojure.string :as string]
             [clojure.zip :as z]
             [cljs.pprint :as pprint]
-            [cljs.test])
+            [cljs.test]
+            [re-frame.core :as rf])
   (:require-macros [cljs.spec.alpha :as s]
                    [cljs.test :refer [is]]
                    [ewan.spec.eaf30 :refer [defzipfn
@@ -786,10 +787,14 @@
   (into {}
         (for [cv (get-controlled-vocabularies hiccup)]
           (let [id (-> cv attrs :cv-id)
-                entries (map (fn [[_ {:keys [description]} value]]
-                               {:description description
-                                :value value})
-                             (children cv))]
+                entries (->> cv
+                             children
+                             (filter #(= (first %) :cv-entry-ml))
+                             (map (fn [[_ {:keys [cve-id]}
+                                       [_ {:keys [description]} value]]]
+                                    {:id cve-id
+                                     :description description
+                                     :value value})))]
             [id entries]))))
 
 (def ^:private *cache* {:latest-doc nil
@@ -897,10 +902,14 @@
                   :controlled-vocabulary-ref)]
     (get (controlled-vocabulary-map hiccup) cv-id)))
 
-
-
 ;; setters
 ;; ----------------------------------------------------------------------------
+(defn- go-to-tier
+  [hiccup tier-id]
+  (-> hiccup
+      go-to-tiers
+      (right-while #(not= (-> % attrs :tier-id) tier-id))))
+
 (defn- go-to-annotation
   "Returns a zipper that has been taken to the annotation element
    with the given ID. Note that this does not return the outer
@@ -908,8 +917,8 @@
    on it, i.e. an :alignable-annotation or a :ref-annotation"
   [hiccup ann-id]
   (let [tier-id (get-tier-of-ann hiccup ann-id)]
-    (-> (go-to-tiers hiccup)
-        (right-while #(not= (-> % attrs :tier-id) tier-id))
+    (-> hiccup
+        (go-to-tier tier-id)
         z/down
         (right-while #(not= (-> %
                                 children
@@ -957,38 +966,140 @@
           next-id
           (recur (incr-ann-id next-id)))))))
 
+(defn- get-tier-constraint
+  "Given a tier id, returns the value of the :constraints attribute
+   of its linked linguistic type if it is present, else nil"
+  [hiccup tier-id]
+  {:post [(or (nil? %)
+              (s/valid? ::stereotype %))]}
+  (->> tier-id
+       (get (tier-map hiccup))
+       :linguistic-type-ref
+       (get (linguistic-type-map hiccup))
+       :constraints))
 
+(defn- ref-annotation
+  "Constructs a new ref-annotation"
+  [annotation-id annotation-ref value]
+  [:annotation {}
+   [:ref-annotation
+    {:annotation-id annotation-id
+     :annotation-ref annotation-ref}
+    [:annotation-value {} value]]])
 
 (defn- insert-ref-annotation
-  [hiccup tier-id ann-id ref-id value]
-  hiccup)
+  [hiccup tier-id annotation-id reference-id value]
+  (-> hiccup
+      (go-to-tier tier-id)
+      ;; Ideally we'd make sure we insert it in the right spot here,
+      ;; but ELAN does not seem to require that annotations be ordered
+      (z/append-child (ref-annotation annotation-id reference-id value))
+      z/root))
+
+(defn- alignable-annotation
+  "Constructs a new alignable-annotation"
+  [annotation-id time-slot-ref1 time-slot-ref2 value]
+  [:annotation {}
+   [:alignable-annotation
+    {:annotation-id annotation-id
+     :time-slot-ref1 time-slot-ref1
+     :time-slot-ref2 time-slot-ref2}
+    [:annotation-value {} value]]])
 
 (defn- insert-alignable-annotation
-  [hiccup tier-id ann-id start-time end-time value]
-  hiccup)
+  [hiccup tier-id annotation-id time-slot-ref1 time-slot-ref2 value]
+  (-> hiccup
+      (go-to-tier tier-id)
+      ;; see above
+      (z/append-child (alignable-annotation annotation-id
+                                            time-slot-ref1
+                                            time-slot-ref2
+                                            value))
+      z/root))
+
+(defn- find-time-slot
+  [hiccup t]
+  [hiccup ""])
+
+(defn- time-subdivision-attrs
+  [hiccup start-time end-time click-time]
+  [hiccup {}])
+
+(defn- included-in-attrs
+  [hiccup start-time end-time click-time]
+  [hiccup {}])
+
+(defn- symbolic-association-attrs
+  [hiccup start-time end-time click-time]
+  [hiccup {}])
+
+(defn- symbolic-subdivision-attrs
+  [hiccup start-time end-time click-time]
+  [hiccup {}])
+
+(defn- no-constraint-attrs
+  [hiccup start-time end-time]
+  (let [[hiccup tsr1] (find-time-slot hiccup start-time)
+        [hiccup tsr2] (find-time-slot hiccup end-time)]
+    [hiccup {:time-slot-ref1 tsr1
+             :time-slot-ref2 tsr2}]))
+
+(defn- calc-ann-attrs
+  "Converts raw UI data into a map containing values for any of the 3 attributes
+   that could appear on an annotation, viz. `:annotation-ref`, `:time-slot-ref1`,
+   and `:time-slot-ref2`. Returns a vector of two values: the first is the new
+   eaf hiccup that contains any new time slots that needed to be made, and the
+   second is a map containing the annotations."
+  [hiccup tier-id start-time end-time click-time]
+  (case (get-tier-constraint hiccup tier-id)
+    "Time_Subdivision"
+    (time-subdivision-attrs hiccup start-time end-time click-time)
+    "Included_In"
+    (included-in-attrs hiccup start-time end-time click-time)
+    "Symbolic_Association"
+    (symbolic-association-attrs hiccup start-time end-time click-time)
+    "Symbolic_Subdivision"
+    (symbolic-subdivision-attrs hiccup start-time end-time click-time)
+    ;; default
+    (no-constraint-attrs hiccup start-time end-time)))
 
 (defn insert-annotation
-  [hiccup {:keys [tier-id value
-                  start-time end-time
-                  ref-id]}]
-  ;; todo: add more preconditions
-  {:pre [(is (some? tier-id))
-         (is (or (and (number? start-time)
-                      (number? end-time))
-                 (string? ref-id))
-             (str "You must provide either a :start-time and :end-time"
-                  " (for an alignable annotation) or a :ref-id "
-                  " (for a ref annotation)"))
+  "Creates a new annotation on a tier for a given value given the raw
+   start and end times of the selection. Constraints are handled within
+   this function, ensuring that the proper time slot refs and ref ids
+   will be set."
+  [hiccup {:keys [tier-id value start-time end-time click-time]}]
+  ;; TODO: add more preconditions
+  {:pre [(is (s/valid? ::annotation-document hiccup))
          (is (not (nil? (get (tier-map hiccup) tier-id)))
              (str "Attempted to create annotation on tier \""
                   tier-id "\", which does not exist"))]
    :post [(s/valid? ::annotation-document %)]}
-  (let [ann-id (next-annotation-id hiccup)]
-    (if (some? ref-id)
-      (insert-ref-annotation hiccup tier-id ann-id ref-id value)
-      (insert-alignable-annotation hiccup tier-id ann-id start-time end-time value))))
+  (let [ann-id (next-annotation-id hiccup)
+        [hiccup {:keys [time-slot-ref1
+                        time-slot-ref2
+                        annotation-ref]}]
+        (calc-ann-attrs hiccup tier-id start-time end-time click-time)]
+    (if (some? annotation-ref)
+      (insert-ref-annotation hiccup tier-id ann-id
+                             annotation-ref
+                             value)
+      (insert-alignable-annotation hiccup tier-id ann-id
+                                   time-slot-ref1 time-slot-ref2
+                                   value))))
 
-;(def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
+(def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
+
+;(swap! re-frame.db.app-db
+;       assoc-in [:project/current-project :eaf]
+;       (insert-alignable-annotation *eaf "K-Spch" "testa" "ts11" "ts13" "test"))
+
+#_ (insert-ref-annotation *eaf "W-IPA" "a555" "a51" "qwe")
+#_ (insert-annotation *eaf {:tier-id "W-IPA"
+                         :value "v"
+                         :ref-id "a51"})
+
+
 
 
 

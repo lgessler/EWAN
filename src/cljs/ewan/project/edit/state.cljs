@@ -57,7 +57,6 @@
 (simple-sub :project/duration [:project/playback :duration])
 (simple-sub :project/current-eaf [:project/current-project :eaf])
 
-
 (rf/reg-sub
  :project/px-per-ms
  :<- [:project/px-per-sec]

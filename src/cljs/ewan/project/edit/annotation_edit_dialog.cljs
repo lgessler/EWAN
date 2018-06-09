@@ -52,11 +52,24 @@
                [:project/current-project :eaf]
                (eaf30/edit-annotation eaf ann-id v)))))
 
-;; TODO
 (rf/reg-event-db
  :project/create-annotation
  (fn [db [_ v]]
-   db))
+   (let [tier-id (:project/tier-for-new-ann db)
+         selection-start (:project/selection-start db)
+         selection-end (:project/selection-end db)
+         current-time (-> db :project/playback :time)
+         eaf (-> db :project/current-project :eaf)
+         constraint (eaf30/get-tier-constraint eaf tier-id)]
+     (assoc-in db
+               [:project/current-project :eaf]
+               (eaf30/insert-annotation
+                eaf
+                {:tier-id tier-id
+                 :click-time current-time
+                 :start-time selection-start
+                 :end-time selection-end
+                 :value v})))))
 
 (rf/reg-sub
  :project/cv-entries
@@ -115,10 +128,10 @@
       :value (:value @state)
       :on-change (fn [_ v]
                    (swap! state assoc :value (:value (nth cv-entries v))))}
-     (for [entry cv-entries]
-       [ui/menu-item {:key (:value entry)
-                      :value (:value entry)
-                      :primary-text (:description entry)}])]))
+     (for [{:keys [id value description]} cv-entries]
+       [ui/menu-item {:key id
+                      :value value
+                      :primary-text description}])]))
 
 (defn- form [state ann-id]
   [:form#annotation-edit-form
