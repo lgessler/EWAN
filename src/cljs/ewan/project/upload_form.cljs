@@ -1,13 +1,12 @@
 (ns ewan.project.upload-form
   (:require [re-frame.core :as rf]
-            [ewan.spec.eaf30 :as eaf30]
+            [ewan.eaf30 :as eaf30]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]
             [cljs-react-material-ui.icons :as ic]
             [reagent.core :as r]
-            [cljs.pprint :as pprint]
-            [ewan.spec.eaf30 :as eaf])
+            [cljs.pprint :as pprint])
   (:require-macros [cljs.spec.alpha :as spec]))
 
 ;; TODO: some areas of this code use getElementById--they should use refs instead.

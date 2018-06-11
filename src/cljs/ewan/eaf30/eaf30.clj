@@ -1,4 +1,4 @@
-(ns ewan.spec.eaf30)
+(ns ewan.eaf30)
 
 (defmacro defzipfn
   [fname & xs]

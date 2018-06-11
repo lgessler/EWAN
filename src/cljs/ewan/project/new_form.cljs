@@ -1,6 +1,6 @@
 (ns ewan.project.new-form
   (:require [re-frame.core :as rf]
-            [ewan.spec.eaf30 :as eaf30]
+            [ewan.eaf30 :as eaf30]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]

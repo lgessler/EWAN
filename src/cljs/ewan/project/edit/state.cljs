@@ -1,7 +1,7 @@
 (ns ewan.project.edit.state
   (:require [re-frame.core :as rf]
             [ewan.common :refer [simple-sub >evt <sub]]
-            [ewan.spec.eaf30 :as eaf30]
+            [ewan.eaf30 :as eaf30]
             [cljs.spec.alpha :as s]))
 
 

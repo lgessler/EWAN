@@ -1,4 +1,4 @@
-(ns ewan.spec.eaf30
+(ns ewan.eaf30
   (:require [cljs.spec.alpha :as s]
             [clojure.data.xml :as xml]
             [cljs-time.format :as timefmt]
@@ -10,8 +10,7 @@
             [re-frame.core :as rf])
   (:require-macros [cljs.spec.alpha :as s]
                    [cljs.test :refer [is]]
-                   [ewan.spec.eaf30 :refer [defzipfn
-                                            defzipfn-]]))
+                   [ewan.eaf30 :refer [defzipfn defzipfn-]]))
 
 ;; ----------------------------------------------------------------------------
 ;; Conversion functions
@@ -791,7 +790,8 @@
                              children
                              (filter #(= (first %) :cv-entry-ml))
                              (map (fn [[_ {:keys [cve-id]}
-                                       [_ {:keys [description]} value]]]
+                                       [_ {:keys [description]}
+                                        value]]]
                                     {:id cve-id
                                      :description description
                                      :value value})))]
@@ -1018,27 +1018,32 @@
       z/root))
 
 (defn- find-time-slot
-  [hiccup t]
-  [hiccup ""])
+  "Given a time (in seconds), attempts to find a time slot used by the
+   tier or one of its parents. If a suitable time slot ID isn't found,
+   a new one is created and time slot id's are reassigned. For this reason,
+   we also need to return the updated annotation document along with the id"
+  [hiccup tier-id time]
+  (let [ms (int (* 1000 time))]
+    [hiccup ""]))
 
 (defn- time-subdivision-attrs
-  [hiccup start-time end-time click-time]
+  [hiccup tier-id start-time end-time click-time]
   [hiccup {}])
 
 (defn- included-in-attrs
-  [hiccup start-time end-time click-time]
+  [hiccup tier-id start-time end-time click-time]
   [hiccup {}])
 
 (defn- symbolic-association-attrs
-  [hiccup start-time end-time click-time]
+  [hiccup tier-id start-time end-time click-time]
   [hiccup {}])
 
 (defn- symbolic-subdivision-attrs
-  [hiccup start-time end-time click-time]
+  [hiccup tier-id start-time end-time click-time]
   [hiccup {}])
 
 (defn- no-constraint-attrs
-  [hiccup start-time end-time]
+  [hiccup tier-id start-time end-time]
   (let [[hiccup tsr1] (find-time-slot hiccup start-time)
         [hiccup tsr2] (find-time-slot hiccup end-time)]
     [hiccup {:time-slot-ref1 tsr1
@@ -1053,15 +1058,15 @@
   [hiccup tier-id start-time end-time click-time]
   (case (get-tier-constraint hiccup tier-id)
     "Time_Subdivision"
-    (time-subdivision-attrs hiccup start-time end-time click-time)
+    (time-subdivision-attrs hiccup tier-id start-time end-time click-time)
     "Included_In"
-    (included-in-attrs hiccup start-time end-time click-time)
+    (included-in-attrs hiccup tier-id start-time end-time click-time)
     "Symbolic_Association"
-    (symbolic-association-attrs hiccup start-time end-time click-time)
+    (symbolic-association-attrs hiccup tier-id start-time end-time click-time)
     "Symbolic_Subdivision"
-    (symbolic-subdivision-attrs hiccup start-time end-time click-time)
+    (symbolic-subdivision-attrs hiccup tier-id start-time end-time click-time)
     ;; default
-    (no-constraint-attrs hiccup start-time end-time)))
+    (no-constraint-attrs hiccup tier-id start-time end-time)))
 
 (defn insert-annotation
   "Creates a new annotation on a tier for a given value given the raw
