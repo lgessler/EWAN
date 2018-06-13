@@ -1,16 +1,15 @@
 (ns ewan.eaf30
   (:require [cljs.spec.alpha :as s]
             [clojure.data.xml :as xml]
-            [cljs-time.format :as timefmt]
-            [cljs.pprint :refer [pprint]]
             [clojure.string :as string]
             [clojure.zip :as z]
-            [cljs.pprint :as pprint]
             [cljs.test]
-            [re-frame.core :as rf])
+            [re-frame.core :as rf]
+            [ewan.common :refer [children attrs tag-name]]
+            [ewan.eaf30.spec :as spec])
   (:require-macros [cljs.spec.alpha :as s]
                    [cljs.test :refer [is]]
-                   [ewan.eaf30 :refer [defzipfn defzipfn-]]))
+                   [ewan.eaf30.macros :refer [defzipfn defzipfn-]]))
 
 ;; ----------------------------------------------------------------------------
 ;; Conversion functions
@@ -21,12 +20,6 @@
 ;; will use eaf-str->hiccup. Note that unlike normal Hiccup, non-terminal nodes
 ;; in this representation MUST have a map present for attributes, even if it
 ;; is empty, to align with the conventions of clojure.data.xml.
-;;
-;; NOTE 1: the XSD schema has many types that are more specific than what
-;; we will specify here. E.g., URL's and numbers in the original XSD schema
-;; are treated here as strings. Ideally we'd be more specific, but it's not
-;; worth my time at the moment since it's unlikely these  would hold corrupt
-;; values anyway in most use-cases. (But of course, it'd be good to have)
 
 (defn- snake->kebab
   [kwd]
@@ -105,378 +98,7 @@
    "<ANNOTATION_DOCUMENT "
    "<ANNOTATION_DOCUMENT xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"http://www.mpi.nl/tools/elan/EAFv2.8.xsd\" "))
 
-
-;; ----------------------------------------------------------------------------
-;; EAF 3.0 spec
-;; ----------------------------------------------------------------------------
-;; This is as near a translation as possible of the EAF 3.0 format as described
-;; by its schema:
-;;    - http://www.mpi.nl/tools/elan/EAFv3.0.xsd
-;;    - http://www.mpi.nl/tools/elan/EAF_Annotation_Format_3.0_and_ELAN.pdf
-;; A number will be given before each element which corresponds to the section
-;; in the PDF guide that describes it.
-;;
-;; One major difference is that the ANNOTATION_TAG element does NOT have the
-;; `xmlns:xsi` and `xsi:noNamespaceSchemaLocation` tags because the CLJS
-;; implementation of `clojure.data.xml` was being too helpful. Instead,
-;; we will just make sure to strip these attrs out when we encounter them
-;; and make sure to write them back when we write back to an XML string.
-;;
-;; Note that we've had to give the definitions in a different order because of
-;; how spec expects all specs used in a dependent spec to be defined before
-;; reference.
-;;
-
-;; 2.2 license
-;; --------------------------------------------
-(s/def ::license-url string?)
-(s/def ::license (s/cat :tag #(= % :license)
-                        :attrs (s/keys :opt-un [::license-url])
-                        :contents string?))
-
-;; 2.3 header
-;; --------------------------------------------
-;; 2.3.1 media descriptor
-(s/def ::media-url string?)
-(s/def ::mime-type string?)
-(s/def ::relative-media-url string?)
-(s/def ::time-origin string?) ;; this should be a number, see Note 1 at top
-(s/def ::extracted-from string?)
-(s/def ::media-descriptor
-  (s/cat :tag #(= % :media-descriptor)
-         :attrs (s/keys :req-un [::media-url
-                                 ::mime-type]
-                        :opt-un [::relative-media-url
-                                 ::time-origin
-                                 ::extracted-from])))
-
-;; 2.3.2 linked file descriptor
-;; mime-type and time-origin defined in 2.3.1
-(s/def ::link-url string?)
-(s/def ::relative-link-url string?)
-(s/def ::associated-with string?)
-(s/def ::linked-file-descriptor
-  (s/cat :tag #(= % :linked-file-descriptor)
-         :attrs (s/keys :req-un [::link-url
-                                 ::mime-type]
-                        :opt-un [::relative-link-url
-                                 ::time-origin
-                                 ::associated-with])))
-
-;; 2.3.3 properties
-(s/def ::name string?)
-(s/def ::property
-  (s/cat :tag #(= % :property)
-         :attrs (s/keys :opt-un [::name])
-         :content string?))
-
-(s/def ::media-file string?)
-(s/def ::time-units #{"milliseconds" "PAL-frames" "NTSC-frames"})
-(s/def ::header
-  (s/cat :tag #(= % :header)
-         :attrs (s/keys :opt-un [::media-file ::time-units])
-         :media-descriptors (s/* (s/spec ::media-descriptor))
-         :linked-file-descriptors (s/* (s/spec ::linked-file-descriptor))
-         :properties (s/* (s/spec ::property))))
-
-
-;; 2.4 time order
-;; --------------------------------------------
-;; 2.4.1 time slots
-(s/def ::time-slot-id string?)
-;; this should actually ensure that TIME_VALUE holds a non-negative
-;; integer. See Note 1 at top
-(s/def ::time-value string?)
-(s/def ::time-slot
-  (s/cat :tag #(= % :time-slot)
-         :attrs (s/keys :req-un [::time-slot-id] :opt-un [::time-value])))
-
-(s/def ::time-order
-  (s/cat :tag #(= % :time-order)
-         :attrs map?
-         :time-slots (s/* (s/spec ::time-slot))))
-
-
-
-;; 2.5 tier
-;; --------------------------------------------
-;; 2.5.2 alignable annotation
-(s/def ::annotation-id string?) ;; next 4 from 2.5.5--also used in 2.5.3
-(s/def ::ext-ref string?)
-(s/def ::lang-ref string?)
-(s/def ::cve-ref string?)
-(s/def ::time-slot-ref1 string?)
-(s/def ::time-slot-ref2 string?)
-(s/def ::svg-ref string?)
-
-;; from 2.5.4--also used in 2.5.3
-(s/def ::annotation-value
-  (s/cat :tag #(= % :annotation-value)
-         :attrs map?
-         :contents (s/? string?)))
-
-(s/def ::alignable-annotation
-  (s/cat :tag #(= % :alignable-annotation)
-         :attrs (s/keys :req-un [::annotation-id
-                                 ::time-slot-ref1
-                                 ::time-slot-ref2]
-                        :opt-un [::svg-ref
-                                 ::ext-ref
-                                 ::lang-ref
-                                 ::cve-ref])
-         :annotation-value (s/spec ::annotation-value)))
-
-;; 2.5.3 ref annotation
-(s/def ::annotation-ref string?)
-(s/def ::previous-annotation string?)
-(s/def ::ref-annotation
-  (s/cat :tag #(= % :ref-annotation)
-         :attrs (s/keys :req-un [::annotation-id
-                                 ::annotation-ref]
-                        :opt-un [::previous-annotation
-                                 ::ext-ref
-                                 ::lang-ref
-                                 ::cve-ref])
-         :annotation-value (s/spec ::annotation-value)))
-
-;; 2.5.1 annotation
-(s/def ::annotation
-  (s/cat :tag #(= % :annotation)
-         :attrs map?
-         :child (s/alt :alignable-annotation
-                       (s/spec ::alignable-annotation)
-                       :ref-annotation
-                       (s/spec ::ref-annotation))))
-
-(s/def ::tier-id string?)
-(s/def ::participant string?)
-(s/def ::annotator string?)
-(s/def ::linguistic-type-ref string?)
-(s/def ::default-locale string?)
-(s/def ::parent-ref string?)
-(s/def ::ext-ref string?)
-(s/def ::tier
-  (s/cat :tag #(= % :tier)
-         :attrs (s/keys :req-un [::tier-id
-                                 ::linguistic-type-ref]
-                        :opt-un [::participant
-                                 ::annotator
-                                 ::default-locale
-                                 ::parent-ref
-                                 ::ext-ref
-                                 ::lang-ref]) ;; already defined in 2.5.2
-         :annotations (s/* (s/spec ::annotation))))
-
-;; 2.6 linguistic type
-;; --------------------------------------------
-(s/def ::linguistic-type-id string?)
-(s/def ::time-alignable #{"true" "false"})
-(s/def ::constraints string?)
-(s/def ::graphic-references #{"true" "false"})
-(s/def ::controlled-vocabulary-ref string?)
-(s/def ::lexicon-ref string?)
-(s/def ::linguistic-type
-  (s/cat :tag #(= % :linguistic-type)
-         :attrs (s/keys :req-un [::linguistic-type-id]
-                        :opt-un [::time-alignable
-                                 ::constraints
-                                 ::graphic-references
-                                 ::controlled-vocabulary-ref
-                                 ::ext-ref
-                                 ::lexicon-ref])))
-;; ext-ref is defined above in 2.5.1. There is a slight semantic difference
-;; here since 2.5.1's ext ref allows multiple refs, but since we're only
-;; checking if it's a string in this spec, it doesn't matter.
-
-;; 2.7 constraint
-;; --------------------------------------------
-(s/def ::stereotype #{"Time_Subdivision" "Symbolic_Subdivision"
-                      "Symbolic_Association" "Included_In"})
-(s/def ::description string?)
-(s/def ::constraint
-  (s/cat :tag #(= % :constraint)
-         :attrs (s/keys :req-un [::stereotype]
-                        :opt-un [::description])))
-
-
-;; 2.9 controlled vocabulary
-;; --------------------------------------------
-
-;; 2.9.2 cve value
-(s/def ::cve-value
-  (s/cat :tag #(= % :cve-value)
-         :attrs (s/keys :req-un [::lang-ref] ;; already defined in 2.5.2
-                        :opt-un [::description]) ;; 2.7
-         :contents string?))
-
-;; 2.9.1 cv entry ml
-(s/def ::cve-id string?)
-(s/def ::cv-entry-ml
-  (s/cat :tag #(= % :cv-entry-ml)
-         :attrs (s/keys :req-un [::cve-id]
-                        :opt-un [::ext-ref]) ;; defined in 2.5.1
-         :values (s/+ (s/spec ::cve-value))))
-
-;; 2.9.3 description
-;; tag is actually called DESCRIPTION, but there is a collision with 2.7
-(s/def ::cv-description
-  (s/cat :tag #(= % :description)
-         :attrs (s/keys :req-un [::lang-ref]) ;; already defined in 2.5.2
-         :contents string?))
-
-(s/def ::cv-id string?)
-(s/def ::controlled-vocabulary
-  (s/cat :tag  #(= % :controlled-vocabulary)
-         :attrs (s/keys :req-un [::cv-id]
-                        :opt-un [::ext-ref]) ;; defined in 2.5.1
-         :descriptions (s/* (s/spec ::cv-description))
-         :cv-entry-ml (s/* (s/spec ::cv-entry-ml))
-         ))
-
-;; 2.10 external ref
-;; --------------------------------------------
-(s/def ::ext-ref-id string?)
-(s/def ::type #{"iso12620" "ecv" "cve_id" "lexen_id" "resource_url"})
-(s/def ::value string?)
-(s/def ::external-ref
-  (s/cat :tag #(= % :external-ref)
-         :attrs (s/keys ::req-un [::ext-ref-id
-                                  ::type
-                                  ::value])))
-
-;; 2.11 locale
-;; --------------------------------------------
-(s/def ::language-code string?)
-(s/def ::country-code string?)
-(s/def ::variant string?)
-(s/def ::locale
-  (s/cat :tag #(= % :locale)
-         :attrs (s/keys ::req-un [::language-code]
-                        ::opt-un [::country-code
-                                  ::variant])))
-
-;; 2.12 language
-;; --------------------------------------------
-(s/def ::lang-id string?)
-(s/def ::lang-def string?)
-(s/def ::lang-label string?)
-(s/def ::language
-  (s/cat :tag #(= % :language)
-         :attrs (s/keys ::req-un [::lang-id]
-                        ::opt-un [::lang-def
-                                  ::lang-label])))
-
-;; 2.13 lexicon ref
-;; --------------------------------------------
-;; some of these have previous collisions, so just namespace them all
-(s/def :ewan.eaf30.lexicon-ref/lex-ref-id string?)
-(s/def :ewan.eaf30.lexicon-ref/name string?)
-(s/def :ewan.eaf30.lexicon-ref/type string?)
-(s/def :ewan.eaf30.lexicon-ref/url string?)
-(s/def :ewan.eaf30.lexicon-ref/lexicon-id string?)
-(s/def :ewan.eaf30.lexicon-ref/lexicon-name string?)
-(s/def :ewan.eaf30.lexicon-ref/datcat-id string?)
-(s/def :ewan.eaf30.lexicon-ref/datcat-name string?)
-(s/def ::lexicon-ref
-  (s/cat :tag #(= % :lexicon-ref)
-         :attrs (s/keys ::req-un [:ewan.eaf30.lexicon-ref/lex-ref-id
-                                  :ewan.eaf30.lexicon-ref/name
-                                  :ewan.eaf30.lexicon-ref/type
-                                  :ewan.eaf30.lexicon-ref/url
-                                  :ewan.eaf30.lexicon-ref/lexicon-id
-                                  :ewan.eaf30.lexicon-ref/lexicon-name]
-                        ::opt-un [:ewan.eaf30.lexicon-ref/datcat-id
-                                  :ewan.eaf30.lexicon-ref/datcat-name])))
-
-;; 2.14 ref link set
-;; --------------------------------------------
-;; 2.14.3 refLinkAttribute
-(s/def ::ref-link-id string?)
-(s/def ::ref-link-name string?)
-;; ext-ref, lang-ref, cve-ref already defined in 2.5
-(s/def ::ref-type string?)
-
-;; 2.14.1 cross ref link
-(s/def ::ref1 string?)
-(s/def ::ref2 string?)
-(s/def ::directionality #{"undirected" "unidirectional" "bidirectional"})
-(s/def ::cross-ref-link
-  (s/cat :tag #(= % :cross-ref-link)
-         :attrs (s/keys ::req-un [::ref1
-                                  ::ref2
-                                  ::ref-link-id]
-                        ::opt-un [::directionality
-                                  ::ref-link-name
-                                  ::ext-ref
-                                  ::lang-ref
-                                  ::cve-ref
-                                  ::ref-type])))
-
-;; 2.14.2 group ref link
-(s/def ::refs string?)
-(s/def ::group-ref-link
-  (s/cat :tag #(= % :group-ref-link)
-         :attrs (s/keys ::req-un [::refs
-                                  ::ref-link-id]
-                        ::opt-un [::ref-link-name
-                                  ::ext-ref
-                                  ::lang-ref
-                                  ::cve-ref
-                                  ::ref-type])))
-
-(s/def ::link-set-id string?)
-(s/def ::link-set-name string?)
-(s/def ::cv-ref string?)
-(s/def ::ref-link-set
-  (s/cat :tag #(= % :ref-link-set)
-         :attrs (s/keys ::req-un [::link-set-id]
-                        ::opt-un [::link-set-name
-                                  ::ext-ref       ;; from 2.5
-                                  ::lang-ref      ;; from 2.5
-                                  ::cv-ref])
-         :links (s/* (s/alt :cross-ref-link
-                            (s/spec ::cross-ref-link)
-                            :group-ref-link
-                            (s/spec ::group-ref-link)))))
-
-
-;; 2.1 annotation document
-;; --------------------------------------------
-(s/def ::author string?)
-(s/def ::date #(some? (timefmt/parse %)))
-(s/def ::version string?)
-(s/def ::format string?)
-;; Note that the order of the seq in the XSD is NOT the same as that of
-;; the section numbers in the explanatory document
-(s/def ::annotation-document
-  (s/cat
-   :tag   #(= % :annotation-document)
-   :attrs (s/and
-           (s/keys :req-un [::author ::date ::version]
-                   :opt-un [::format])
-           ;; if present, format must match version
-           #(if (:format %)
-              (= (:format %) (:version %))
-              true))
-   :license (s/* (s/spec ::license)) ;; 2.2
-   :header (s/spec ::header) ;; 2.3
-   :time-order (s/spec ::time-order) ;; 2.4
-   :tiers (s/* (s/spec ::tier)) ;; 2.5
-   :linguistic-type (s/* (s/spec ::linguistic-type)) ;; 2.6
-   :locale (s/* (s/spec ::locale)) ;; 2.11
-   :language (s/* (s/spec ::language)) ;; 2.12
-   :constraints (s/* (s/spec ::constraint)) ;; 2.7
-   :controlled-vocabulary (s/* (s/spec ::controlled-vocabulary)) ;; 2.9
-   :lexicon-ref (s/* (s/spec ::lexicon-ref)) ;; 2.13
-   :ref-link-set (s/* (s/spec ::ref-link-set)) ;; 2.14
-   :external-ref (s/* (s/spec ::external-ref)) ;; 2.10
-   ))
-
-;; ----------------------------------------------------------------------------
-;; Public API
-;; ----------------------------------------------------------------------------
-;; (Refer to the conversion functions at the beginning of this file.)
-
+;; public conversion funcs -----------------------------------------------------
 (defn eaf-str->hiccup
   "Takes the raw text of an EAF file, parses it into XML, and gives the hiccup
   analog of that XML."
@@ -498,7 +120,7 @@
 (defn eaf?
   "Tests whether the hiccup supplied conforms to the EAF 3.0 spec"
   [hiccup]
-  (s/valid? ::annotation-document hiccup))
+  (s/valid? ::spec/annotation-document hiccup))
 
 (defn create-eaf
   "Creates a new, minimal set of EAF 3.0 hiccup, roughly mimicking what
@@ -521,41 +143,25 @@
    [:linguistic-type {:graphic-references "false"
                       :linguistic-type-id "default-lt"
                       :time-alignable "true"}]
-   [:constraint {:description "Time subdivision of parent annotation's time interval, no time gaps allowed within this interval"
-                 :stereotype "Time_Subdivision"}]
-   [:constraint {:description "Symbolic subdivision of a parent annotation. Annotations refering to the same parent are ordered"
-                 :stereotype "Symbolic_Subdivision"}]
-   [:constraint {:description "1-1 association with a parent annotation"
-                 :stereotype "Symbolic_Association"}]
-   [:constraint {:description "Time alignable annotations within the parent annotation's time interval, gaps are allowed"
-                 :stereotype "Included_In"}]])
+   [:constraint
+    {:description "Time subdivision of parent annotation's time interval, no time gaps allowed within this interval"
+     :stereotype "Time_Subdivision"}]
+   [:constraint
+    {:description "Symbolic subdivision of a parent annotation. Annotations refering to the same parent are ordered"
+     :stereotype "Symbolic_Subdivision"}]
+   [:constraint
+    {:description "1-1 association with a parent annotation"
+     :stereotype "Symbolic_Association"}]
+   [:constraint
+    {:description "Time alignable annotations within the parent annotation's time interval, gaps are allowed"
+     :stereotype "Included_In"}]])
 
-;; helper funcs
+;; ----------------------------------------------------------------------------
+;; zip helper funcs
 ;; ----------------------------------------------------------------------------
 ;; Internally, we will use clojure.zip, as it's probably the most ergonomic way
 ;; of manipulating this rather large hiccup structure. The public API for this
 ;; module, however, will never expose a zipper to consumers.
-
-;; for hiccup
-(defn- tag-name
-  [hiccup]
-  (first hiccup))
-
-(defn- attrs
-  [hiccup]
-  (and (map? (second hiccup))
-       (second hiccup)))
-
-(defn- children
-  [hiccup]
-  (cond
-    (nil? hiccup)
-    nil
-    (not (map? (second hiccup)))
-    (js/Error. "EAF hiccup must have an attrs map, even if it is empty.")
-    :else
-    (drop 2 hiccup)))
-
 (defn- hiccup-zipper
   "Returns a zipper for Hiccup forms, given a root form."
   [root]
@@ -611,7 +217,9 @@
   [loc kwd]
   (take-right-while loc #(= (tag-name %) kwd)))
 
-;; Trivial getters and `go-to` functions
+
+;; ----------------------------------------------------------------------------
+;; Foundational `go-to` functions
 ;; ----------------------------------------------------------------------------
 ;; defzipfn is a macro that generates something like this:
 ;; (defn <name> [hiccup] (-> hiccup hiccup-zipper <arg1> <arg2> ...))
@@ -630,8 +238,9 @@
 (defzipfn- go-to-lexicon-refs z/down (right-to-first :lexicon-ref))
 (defzipfn- go-to-external-refs z/down (right-to-first :external-ref))
 
-
-
+;; ----------------------------------------------------------------------------
+;; Trivial `get-` functions
+;; ----------------------------------------------------------------------------
 (defzipfn get-date z/node attrs :date)
 (defzipfn get-author z/node attrs :author)
 (defzipfn get-version z/node attrs :version)
@@ -688,16 +297,32 @@
       go-to-controlled-vocabularies
       (take-right-to-last :controlled-vocabulary)))
 
+(defn get-time-slots
+  "Returns a seq of all time slots under the :time-order element"
+  [hiccup]
+  (-> hiccup
+      go-to-time-order
+      z/children))
+
+(defn get-alignable-annotations
+  "Returns a seq of all alignable annotations"
+  [hiccup]
+  (->> hiccup
+       get-tiers           ;; seq of tiers
+       (mapcat children)   ;; grab all :annotations and put into single seq
+       (map (comp first children)) ;; discard outer :annotation element
+       (filter #(= (tag-name %) :alignable-annotation))))
+
 ;; NYI: get-* for some top-level elements like :constraint
+
 
 ;; derived data structures and cache
 ;; ----------------------------------------------------------------------------
 ;; Non-trivial getters and setters rely on data that is most efficiently
 ;; obtained from data structures that are derived from the XML.
-;; Most of the time, we don't care about an old hiccup
-;; structure after we've encountered a new one, so we keep track of the
-;; latest one we've seen in `:latest-doc` and cache derived structures
-;; with the other keys in `*cache*`.
+;; Most of the time, we don't care about an old hiccup structure after we've
+;; encountered a new one, so we keep track of the latest one we've seen in
+;; `:latest-doc` and cache derived structures with the other keys in `*cache*`.
 ;;
 ;; Functions that rely on derived structures call functions which are
 ;; suffixed with `map-`. These functions check to see if the hiccup
@@ -797,11 +422,29 @@
                                      :value value})))]
             [id entries]))))
 
+(declare get-tier-of-ann)
+(defn- time-slot-map-uncached
+  "map from time slot id's to their values and tiers that use them"
+  [hiccup]
+  (let [alignable-annotations (get-alignable-annotations hiccup)]
+    (into {}
+          (for [ts (get-time-slots hiccup)]
+            (let [{:keys [time-slot-id time-value]} (attrs ts)
+                  used-in (->> alignable-annotations
+                               (filter #(or (= time-slot-id (-> % attrs :time-slot-ref1))
+                                            (= time-slot-id (-> % attrs :time-slot-ref2))))
+                               (map (comp :annotation-id attrs))
+                               (map #(get-tier-of-ann hiccup %))
+                               (into #{}))]
+              [time-slot-id {:value time-value
+                             :used-in used-in}])))))
+
 (def ^:private *cache* {:latest-doc nil
                         :annotation-map nil
                         :tier-parent-map nil
                         :linguistic-type-map nil
-                        :controlled-vocabulary-map nil})
+                        :controlled-vocabulary-map nil
+                        :time-slot-map nil})
 
 (defn- update-cache!
   [hiccup]
@@ -814,7 +457,9 @@
                  :linguistic-type-map
                  (linguistic-type-map-uncached hiccup)
                  :controlled-vocabulary-map
-                 (controlled-vocabulary-map-uncached hiccup)}))
+                 (controlled-vocabulary-map-uncached hiccup)})
+  ;; time-slot-map depends on annotation-map
+  (set! *cache* (assoc *cache* :time-slot-map (time-slot-map-uncached hiccup))))
 
 (defn- make-cached
   [ckey]
@@ -827,27 +472,18 @@
 (def ^:private tier-map (make-cached :tier-map))
 (def ^:private linguistic-type-map (make-cached :linguistic-type-map))
 (def ^:private controlled-vocabulary-map (make-cached :controlled-vocabulary-map))
+(def ^:private time-slot-map (make-cached :time-slot-map))
 
 
+;; ----------------------------------------------------------------------------
 ;; More involved getters
 ;; ----------------------------------------------------------------------------
-(defn get-annotation-times
-  "Returns a map with keys :time1 :time2 representing the millisecond time
-   for a given annotation. If the annotation is a reference annotation, its
-   times are recursively resolved."
-  [hiccup ann-id]
-  (let [{:keys [ref] :as m}
-        (get (annotation-map hiccup) ann-id)]
-    (if ref
-      (recur hiccup ref)
-      m)))
-
-(defn get-annotation-value
-  "Returns the value of an annotation"
-  [hiccup ann-id]
-  (-> (annotation-map hiccup)
-      (get ann-id)
-      :value))
+;; tier getters ----------------------------------------------------------------
+(defn- go-to-tier
+  [hiccup tier-id]
+  (-> hiccup
+      go-to-tiers
+      (right-while #(not= (-> % attrs :tier-id) tier-id))))
 
 (defn get-parent-tiers
   "Given a tier ID, return a seq of parent tiers"
@@ -864,17 +500,10 @@
   "Given a tier ID, return true if there are other tiers
    that refer to it with :parent-ref; nil otherwise"
   [hiccup tier-id]
-  (some (fn [[child {:keys [parent-ref]}]]
-          (= parent-ref tier-id))
-        (tier-map hiccup)))
-
-(defn get-tier-of-ann
-  "Returns the ID of the tier that holds the annotation, or nil
-   if the annotation doesn't exist"
-  [hiccup ann-id]
-  (let [map (annotation-map hiccup)]
-    (some-> (get map ann-id)
-            :tier-id)))
+  (->> hiccup
+       tier-map
+       (some (fn [[child {:keys [parent-ref]}]]
+               (= parent-ref tier-id)))))
 
 (defn has-controlled-vocabulary
   "True if the tier has a linguistic type that references
@@ -902,13 +531,14 @@
                   :controlled-vocabulary-ref)]
     (get (controlled-vocabulary-map hiccup) cv-id)))
 
-;; setters
-;; ----------------------------------------------------------------------------
-(defn- go-to-tier
-  [hiccup tier-id]
-  (-> hiccup
-      go-to-tiers
-      (right-while #(not= (-> % attrs :tier-id) tier-id))))
+;; annotation getters ---------------------------------------------------------
+(defn get-tier-of-ann
+  "Returns the ID of the tier that holds the annotation, or nil
+   if the annotation doesn't exist"
+  [hiccup ann-id]
+  (let [map (annotation-map hiccup)]
+    (some-> (get map ann-id)
+            :tier-id)))
 
 (defn- go-to-annotation
   "Returns a zipper that has been taken to the annotation element
@@ -920,58 +550,107 @@
     (-> hiccup
         (go-to-tier tier-id)
         z/down
-        (right-while #(not= (-> %
-                                children
-                                first
-                                attrs
-                                :annotation-id) ann-id))
+        (right-while #(not= (-> % children first attrs :annotation-id)
+                            ann-id))
         z/down)))
 
-(defn edit-annotation
-  "Replaces the inner text of the :annotation-value node for a
-   given annotation and returns the resulting :annotation-document"
-  [hiccup ann-id new-value]
-  (let [ann (go-to-annotation hiccup ann-id)]
-    (-> ann
-        z/down
-        z/down
-        (z/replace new-value)
-        z/root)))
+(defn get-annotation-times
+  "Returns a map with keys :time1 :time2 representing the millisecond time
+   for a given annotation. If the annotation is a reference annotation, its
+   times are recursively resolved."
+  [hiccup ann-id]
+  (let [{:keys [ref] :as m}
+        (get (annotation-map hiccup) ann-id)]
+    (if ref
+      (recur hiccup ref)
+      m)))
 
-(defn- incr-ann-id
+(defn get-annotation-value
+  "Returns the value of an annotation"
+  [hiccup ann-id]
+  (-> (annotation-map hiccup)
+      (get ann-id)
+      :value))
+
+;; ----------------------------------------------------------------------------
+;; setters
+;; ----------------------------------------------------------------------------
+;; id helpers -----------------------------------------------------------------
+(defn- make-incr-id
   "Given a string like \"a99\", returns \"a100\". The returned string always
    begins with \"a\", even if an \"a\" was not present in the provided string.
    If the provided string does not have an identifiable sequence of numbers,
    \"a1\" is returned."
-  [ann-id]
-  (->> ann-id
-       (re-find #"\d+")
-       int              ;; (int nil) => 0
-       inc
-       (str "a")))
+  [prefix]
+  (fn [id]
+    (->> id
+         (re-find #"\d+")
+         int              ;; (int nil) => 0
+         inc
+         (str prefix))))
 
-(defn- next-annotation-id
-  [hiccup]
-  (let [last-id (some->> hiccup
-                         annotation-map
-                         keys
-                         (sort #(compare (int (re-find #"\d+" %1))
-                                         (int (re-find #"\d+" %2))))
-                         last)
-        ann-map (annotation-map hiccup)]
-    (if (nil? last-id)
-      "a1"
-      (loop [next-id last-id]
-        (if (nil? (get ann-map next-id))
-          next-id
-          (recur (incr-ann-id next-id)))))))
+(def ^:private incr-ann-id (make-incr-id "a"))
+(def ^:private incr-ts-id (make-incr-id "ts"))
 
+(defn- make-next-id
+  "Determines what the next annotation ID to be used ought to be. Regardless
+   of whatever annotation ID conventions may be present in the file, it always
+   returns an ID of the form `<prefix>[0-9]+`. The returned ID is guaranteed to not
+   to occur in any existing annotation."
+  [prefix map-func incr-id-func]
+  (fn [hiccup]
+    (let [last-id (some->> hiccup
+                           map-func
+                           keys
+                           (sort #(compare (int (re-find #"\d+" %1))
+                                           (int (re-find #"\d+" %2))))
+                           last)
+          map (map-func hiccup)]
+      (if (nil? last-id)
+        (str prefix "1")
+        (loop [next-id last-id]
+          (if (nil? (get map next-id))
+            next-id
+            (recur (incr-id-func next-id))))))))
+
+(def ^:private next-annotation-id (make-next-id "a" annotation-map incr-ann-id))
+(def ^:private next-time-slot-id (make-next-id "ts" time-slot-map incr-ts-id))
+
+;; time slot id management (internal) -----------------------------------------
+
+(defn- find-time-slot
+  "Given a time (in seconds), attempts to find a time slot used by the
+   tier or one of its parents. If a suitable time slot ID isn't found,
+   a new one is created and time slot id's are reassigned. For this reason,
+   we also need to return the updated annotation document along with the id"
+  [hiccup tier-id time]
+  (let [ms (int (* 1000 time))]
+    [hiccup ""]))
+
+(defn- reassign-time-slot-ids
+  "ELAN maintains at least a couple constraints on time slots:
+    1. TSIDs are contiguous positive integers
+    2. time slots have monotonically increasing time values (if present)
+   For this reason, whenever an annotation is deleted or created, this
+   function needs to be called so we can enforce these constraints.
+
+   Note that this function assumes that there was AT MOST one addition or
+   deletion."
+  [hiccup new-time]
+  (-> hiccup
+      go-to-time-order
+      z/down
+      ))
+
+;;(time-slot-map *eaf)
+
+;; annotation insertion -------------------------------------------------------
+;; There's a lot that goes into this!
 (defn- get-tier-constraint
   "Given a tier id, returns the value of the :constraints attribute
    of its linked linguistic type if it is present, else nil"
   [hiccup tier-id]
-  {:post [(or (nil? %)
-              (s/valid? ::stereotype %))]}
+  {:post [(or (nil? %) (eaf? %))]}
   (->> tier-id
        (get (tier-map hiccup))
        :linguistic-type-ref
@@ -1017,15 +696,6 @@
                                             value))
       z/root))
 
-(defn- find-time-slot
-  "Given a time (in seconds), attempts to find a time slot used by the
-   tier or one of its parents. If a suitable time slot ID isn't found,
-   a new one is created and time slot id's are reassigned. For this reason,
-   we also need to return the updated annotation document along with the id"
-  [hiccup tier-id time]
-  (let [ms (int (* 1000 time))]
-    [hiccup ""]))
-
 (defn- time-subdivision-attrs
   [hiccup tier-id start-time end-time click-time]
   [hiccup {}])
@@ -1044,8 +714,8 @@
 
 (defn- no-constraint-attrs
   [hiccup tier-id start-time end-time]
-  (let [[hiccup tsr1] (find-time-slot hiccup start-time)
-        [hiccup tsr2] (find-time-slot hiccup end-time)]
+  (let [[hiccup tsr1] (find-time-slot hiccup tier-id start-time)
+        [hiccup tsr2] (find-time-slot hiccup tier-id end-time)]
     [hiccup {:time-slot-ref1 tsr1
              :time-slot-ref2 tsr2}]))
 
@@ -1075,11 +745,11 @@
    will be set."
   [hiccup {:keys [tier-id value start-time end-time click-time]}]
   ;; TODO: add more preconditions
-  {:pre [(is (s/valid? ::annotation-document hiccup))
+  {:pre [(is (eaf? hiccup))
          (is (not (nil? (get (tier-map hiccup) tier-id)))
              (str "Attempted to create annotation on tier \""
                   tier-id "\", which does not exist"))]
-   :post [(s/valid? ::annotation-document %)]}
+   :post [(eaf? %)]}
   (let [ann-id (next-annotation-id hiccup)
         [hiccup {:keys [time-slot-ref1
                         time-slot-ref2
@@ -1093,8 +763,22 @@
                                    time-slot-ref1 time-slot-ref2
                                    value))))
 
-(def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
 
+;; annotation editing ----------------------------------------------------------
+(defn edit-annotation
+  "Replaces the inner text of the :annotation-value node for a
+   given annotation and returns the resulting :annotation-document"
+  [hiccup ann-id new-value]
+  (let [ann (go-to-annotation hiccup ann-id)]
+    (-> ann
+        z/down
+        z/down
+        (z/replace new-value)
+        z/root)))
+
+(comment
+  (def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
+)
 ;(swap! re-frame.db.app-db
 ;       assoc-in [:project/current-project :eaf]
 ;       (insert-alignable-annotation *eaf "K-Spch" "testa" "ts11" "ts13" "test"))
