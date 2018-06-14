@@ -77,7 +77,7 @@
 ;; Cf: https://stackoverflow.com/questions/10549290/what-would-be-the-regular-expression-to-remove-whitespaces-between-tags-only-in?noredirect=1&lq=1
 (defn- unsafe-remove-whitespace
   [str]
-  (clojure.string/replace str #">\s+<" "><"))
+  (string/replace str #">\s+<" "><"))
 
 (defn- add-annotation-document-attrs
   "A hack necessary to restore attributes on the XML string since
@@ -178,6 +178,16 @@
   (when loc
     (when-let [node (z/node loc)]
       (if (pred node)
+        (recur (z/right loc) pred)
+        loc))))
+
+(defn- right-while-some
+  "Call z/right while (pred (z/node zipper)) is true AND (z/right zipper) is
+   not nil"
+  [loc pred]
+  (when loc
+    (when-let [node (z/node loc)]
+      (if (and (pred node) (-> loc z/right nil? not))
         (recur (z/right loc) pred)
         loc))))
 
@@ -576,6 +586,13 @@
 ;; setters
 ;; ----------------------------------------------------------------------------
 ;; id helpers -----------------------------------------------------------------
+(defn- sort-by-id-num
+  [s]
+  (sort (fn [a b]
+          (compare (int (re-find #"\d+" a))
+                   (int (re-find #"\d+" b))))
+        s))
+
 (defn- make-incr-id
   "Given a string like \"a99\", returns \"a100\". The returned string always
    begins with \"a\", even if an \"a\" was not present in the provided string.
@@ -588,6 +605,20 @@
          int              ;; (int nil) => 0
          inc
          (str prefix))))
+
+(defn- id-numbers-are-contiguous
+  "Given a sorted seq of ids, returns the greatest number if they are contiguous,
+   or false if they are not contiguous. (An empty seq is contiguous.)"
+  [s]
+  (reduce (fn [acc id]
+            (if (and acc
+                     (= (- (js/parseInt (re-find #"\d+" id))
+                           acc)
+                        1))
+              (inc acc)
+              false))
+          0
+          s))
 
 (def ^:private incr-ann-id (make-incr-id "a"))
 (def ^:private incr-ts-id (make-incr-id "ts"))
@@ -602,8 +633,7 @@
     (let [last-id (some->> hiccup
                            map-func
                            keys
-                           (sort #(compare (int (re-find #"\d+" %1))
-                                           (int (re-find #"\d+" %2))))
+                           sort-by-id-num
                            last)
           map (map-func hiccup)]
       (if (nil? last-id)
@@ -617,15 +647,63 @@
 (def ^:private next-time-slot-id (make-next-id "ts" time-slot-map incr-ts-id))
 
 ;; time slot id management (internal) -----------------------------------------
+(defn- update-time-slots-after-insertion
+  [hiccup]
+  (let [id-at-loc #(-> % z/node attrs :time-slot-id)]
+    (loop [loc (-> hiccup go-to-time-order z/down)
+           prev-id nil
+           old-to-new {}]
+      (cond
+        ;; reached the new time slot, or we've already encountered it
+        (or (= (id-at-loc loc) "**REPLACEME**")
+            (get old-to-new "**REPLACEME**"))
+        (let [old-id (id-at-loc loc)
+              new-id (incr-ts-id prev-id)
+              new-node (-> loc
+                           z/node
+                           (update 1 assoc :time-slot-id new-id))
+              new-loc (-> loc (z/replace new-node))]
+          (if (nil? (z/right new-loc))
+            [(z/root new-loc) (assoc old-to-new old-id new-id)]
+            (recur (z/right new-loc) new-id (assoc old-to-new old-id new-id))))
+        ;; haven't reached the new time slot yet--id is identical so we don't record it
+        :else
+        (recur (z/right loc) (id-at-loc loc) old-to-new)))))
 
-(defn- find-time-slot
-  "Given a time (in seconds), attempts to find a time slot used by the
-   tier or one of its parents. If a suitable time slot ID isn't found,
-   a new one is created and time slot id's are reassigned. For this reason,
-   we also need to return the updated annotation document along with the id"
-  [hiccup tier-id time]
-  (let [ms (int (* 1000 time))]
-    [hiccup ""]))
+(defn- update-time-slots-after-deletion
+  [hiccup]
+  ;; nyi
+  [hiccup {}])
+
+(defn- update-time-slot-refs
+  [hiccup old-to-new]
+  (letfn [(replace-ref [ref]
+            (or (get old-to-new ref) ref))
+          (process-ann [loc]
+            (let [[_ _
+                   [ann-type
+                    {:keys [time-slot-ref1
+                            time-slot-ref2] :as attrs}
+                    _] :as node] (z/node loc)]
+              (if (= ann-type :alignable-annotation)
+                (let [new-attrs (-> attrs
+                                    (update :time-slot-ref1 replace-ref time-slot-ref1)
+                                    (update :time-slot-ref2 replace-ref time-slot-ref2))]
+                  (z/replace loc (assoc-in node [2 1] new-attrs)))
+                loc)))
+          (process-tier [loc]
+            (if-not (z/children loc)
+              loc
+              (loop [loc (z/down loc)]
+                (if (z/right loc)
+                  (recur (-> loc process-ann z/right))
+                  (-> loc process-ann z/up)))))]
+
+    (loop [loc (go-to-tiers hiccup)]
+      (if (and (z/right loc)
+               (-> loc z/right z/node tag-name (= :tier)))
+        (recur (-> loc process-tier z/right))
+        (-> loc process-tier z/root)))))
 
 (defn- reassign-time-slot-ids
   "ELAN maintains at least a couple constraints on time slots:
@@ -635,14 +713,90 @@
    function needs to be called so we can enforce these constraints.
 
    Note that this function assumes that there was AT MOST one addition or
-   deletion."
-  [hiccup new-time]
-  (-> hiccup
-      go-to-time-order
-      z/down
-      ))
+   deletion. It also assumes that TSIDs are 1-indexed."
+  [hiccup]
+  {:pre [(eaf? hiccup)]
+   :post [(eaf? %)]}
+  ;; 1. check for gap in numbers, or id like **REPLACE**
+  (let [tsm (time-slot-map hiccup)
+        sorted-tsids (-> tsm keys sort-by-id-num)]
+    (cond
+      ;; insertion
+      (get tsm "**REPLACEME**")
+      (let [[hiccup old-to-new] (update-time-slots-after-insertion hiccup)]
+        (update-time-slot-refs hiccup old-to-new))
+      ;; deletion
+      (not (id-numbers-are-contiguous sorted-tsids))
+      (let [[hiccup old-to-new] (update-time-slots-after-deletion hiccup)]
+        (update-time-slot-refs hiccup old-to-new))
+      :else
+      (js/Error.
+       "Tried to reassign time slot IDs, but no insertion or deletion was found."))))
 
-;;(time-slot-map *eaf)
+(defn- time-slot
+  [value]
+  {:pre [(and (string? value)
+              (re-matches #"^\d+$" value))]}
+  [:time-slot {:time-slot-id "**REPLACEME**"
+               :time-value value}])
+
+(defn- insert-new-time-slot
+  "Given a set of hiccup and a millisecond value, creates and inserts
+   a new time slot with id **REPLACEME**. You MUST call
+   `reassign-time-slot-ids` after this to ensure that the temporary ID
+   is replaced before any hiccup is returned to consuming code."
+  [hiccup ms]
+  {:pre [(and (string? ms) (re-matches #"^\d+$" ms))
+         (eaf? hiccup)]
+   :post [(eaf? %)]}
+  (let [loc (-> hiccup
+                go-to-time-order
+                z/down
+                (right-while-some
+                    #(>= (js/parseInt ms)
+                         (-> % attrs :time-value js/parseInt))))
+        node (time-slot ms)]
+    (if (< (js/parseInt ms)
+           (-> loc z/node attrs :time-value js/parseInt))
+      (-> loc (z/insert-left node) z/root)
+      (-> loc (z/insert-right node) z/root))))
+
+(defn- find-or-create-time-slot
+  "Given a time (in seconds), attempts to find a time slot used by the
+   tier or one of its parents. If a suitable time slot ID isn't found,
+   a new one is created and time slot id's are reassigned. For this reason,
+   we also need to return the updated annotation document along with the id"
+  [hiccup tier-id time]
+  {:pre [(eaf? hiccup) (string? tier-id) (number? time)]
+   :post [(eaf? (first %)) (some? (second %))]}
+  (let [ms (str (int (* 1000 time)))
+        tsm (time-slot-map hiccup)
+        ;; "ELAN assumes [...] that a single TIME_SLOT is not referenced by
+        ;; multiple annotations if they don't depend on each other."
+        ;; TODO: find out what happens if:
+        ;;  1. t1 <- t2 <- t3
+        ;;  2. a1 on t3 uses ts1 at time1
+        ;;  3. a2 on t2 looks for a time slot at time1
+        ;; currently, this function will make a new time slot, but maybe
+        ;; it shouldn't
+        sharing-tiers (set (cons tier-id (get-parent-tiers hiccup tier-id)))
+        matching-id (fn [[tsid {:keys [value used-in]}]]
+                      (and (= value ms)
+                           (> (count (clojure.set/intersection
+                                      sharing-tiers
+                                      used-in))
+                              0)
+                           tsid))
+        matching-time-slot (some matching-id tsm)]
+    (if matching-time-slot
+      [hiccup matching-time-slot]
+      (let [hiccup (-> hiccup
+                       (insert-new-time-slot ms)
+                       reassign-time-slot-ids)]
+        [hiccup (some (fn [[tsid {:keys [value]}]]
+                        (and (= value ms)
+                             tsid))
+                      (time-slot-map hiccup))]))))
 
 ;; annotation insertion -------------------------------------------------------
 ;; There's a lot that goes into this!
@@ -650,7 +804,7 @@
   "Given a tier id, returns the value of the :constraints attribute
    of its linked linguistic type if it is present, else nil"
   [hiccup tier-id]
-  {:post [(or (nil? %) (eaf? %))]}
+  {:post [(or (nil? %) (s/valid? ::spec/stereotype %))]}
   (->> tier-id
        (get (tier-map hiccup))
        :linguistic-type-ref
@@ -683,7 +837,9 @@
     {:annotation-id annotation-id
      :time-slot-ref1 time-slot-ref1
      :time-slot-ref2 time-slot-ref2}
-    [:annotation-value {} value]]])
+    (if value
+      [:annotation-value {} value]
+      [:annotation-value {}])]])
 
 (defn- insert-alignable-annotation
   [hiccup tier-id annotation-id time-slot-ref1 time-slot-ref2 value]
@@ -714,8 +870,8 @@
 
 (defn- no-constraint-attrs
   [hiccup tier-id start-time end-time]
-  (let [[hiccup tsr1] (find-time-slot hiccup tier-id start-time)
-        [hiccup tsr2] (find-time-slot hiccup tier-id end-time)]
+  (let [[hiccup tsr1] (find-or-create-time-slot hiccup tier-id start-time)
+        [hiccup tsr2] (find-or-create-time-slot hiccup tier-id end-time)]
     [hiccup {:time-slot-ref1 tsr1
              :time-slot-ref2 tsr2}]))
 
@@ -763,6 +919,33 @@
                                    time-slot-ref1 time-slot-ref2
                                    value))))
 
+(comment
+  (def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
+  (insert-annotation *eaf {:tier-id "K-Spch"
+                           :start-time 1.5
+                           :end-time 2.5
+                           :click-time 2.0
+                           :value "Hello, world!"})
+  (swap! re-frame.db.app-db
+         assoc-in
+         [:project/current-project :eaf]
+         (insert-annotation *eaf {:tier-id "K-Spch"
+                                  :start-time 0.5
+                                  :end-time 3.5
+                                  :click-time 2.0
+                                  :value "Helo, world!"}))
+
+  (-> (:eaf (:project/current-project re-frame.db.app-db.state))
+      get-tiers
+      first
+      butlast
+      last)
+  (-> *eaf get-tiers first last)
+  (get-time-slot-val (:eaf (:project/current-project re-frame.db.app-db.state)) "ts18")
+
+
+  )
+
 
 ;; annotation editing ----------------------------------------------------------
 (defn edit-annotation
@@ -775,19 +958,6 @@
         z/down
         (z/replace new-value)
         z/root)))
-
-(comment
-  (def *eaf (:eaf (:project/current-project re-frame.db.app-db.state)))
-)
-;(swap! re-frame.db.app-db
-;       assoc-in [:project/current-project :eaf]
-;       (insert-alignable-annotation *eaf "K-Spch" "testa" "ts11" "ts13" "test"))
-
-#_ (insert-ref-annotation *eaf "W-IPA" "a555" "a51" "qwe")
-#_ (insert-annotation *eaf {:tier-id "W-IPA"
-                         :value "v"
-                         :ref-id "a51"})
-
 
 
 
