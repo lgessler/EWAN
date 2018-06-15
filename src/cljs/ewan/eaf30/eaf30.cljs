@@ -541,6 +541,17 @@
                   :controlled-vocabulary-ref)]
     (get (controlled-vocabulary-map hiccup) cv-id)))
 
+(defn- get-tier-constraint
+  "Given a tier id, returns the value of the :constraints attribute
+   of its linked linguistic type if it is present, else nil"
+  [hiccup tier-id]
+  {:post [(or (nil? %) (s/valid? ::spec/stereotype %))]}
+  (->> tier-id
+       (get (tier-map hiccup))
+       :linguistic-type-ref
+       (get (linguistic-type-map hiccup))
+       :constraints))
+
 ;; annotation getters ---------------------------------------------------------
 (defn get-tier-of-ann
   "Returns the ID of the tier that holds the annotation, or nil
@@ -800,16 +811,6 @@
 
 ;; annotation insertion -------------------------------------------------------
 ;; There's a lot that goes into this!
-(defn- get-tier-constraint
-  "Given a tier id, returns the value of the :constraints attribute
-   of its linked linguistic type if it is present, else nil"
-  [hiccup tier-id]
-  {:post [(or (nil? %) (s/valid? ::spec/stereotype %))]}
-  (->> tier-id
-       (get (tier-map hiccup))
-       :linguistic-type-ref
-       (get (linguistic-type-map hiccup))
-       :constraints))
 
 (defn- ref-annotation
   "Constructs a new ref-annotation"
@@ -818,14 +819,14 @@
    [:ref-annotation
     {:annotation-id annotation-id
      :annotation-ref annotation-ref}
-    [:annotation-value {} value]]])
+    (if value
+      [:annotation-value {} value]
+      [:annotation-value {}])]])
 
 (defn- insert-ref-annotation
   [hiccup tier-id annotation-id reference-id value]
   (-> hiccup
       (go-to-tier tier-id)
-      ;; Ideally we'd make sure we insert it in the right spot here,
-      ;; but ELAN does not seem to require that annotations be ordered
       (z/append-child (ref-annotation annotation-id reference-id value))
       z/root))
 
@@ -958,31 +959,3 @@
         z/down
         (z/replace new-value)
         z/root)))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

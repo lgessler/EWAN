@@ -34,9 +34,7 @@
  :project/close-ann-edit-dialog
  (fn [db _]
    (-> db
-       (assoc :project/ann-edit-dialog-open false)
-       (assoc :project/tier-for-new-ann nil)
-       (assoc :project/editing-ann-id nil))))
+       (assoc :project/ann-edit-dialog-open false))))
 
 (rf/reg-event-db
  :project/init-ann-edit-dialog
@@ -101,7 +99,7 @@
 (defn- submit
   [state]
   (let [ann-id (:ann-id @state)]
-    (>evt [:project/close-ann-edit-dialog])
+    (rf/dispatch-sync [:project/close-ann-edit-dialog])
     (if ann-id
       (>evt [:project/edit-annotation (:value @state)])
       (>evt [:project/create-annotation (:value @state)]))))
