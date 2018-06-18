@@ -41,33 +41,60 @@
  (fn [db _]
    (merge db default-db)))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :project/edit-annotation
- (fn [db [_ v]]
+ (fn [{:keys [db]} [_ v]]
    (let [ann-id (:project/editing-ann-id db)
-         eaf (get-in db [:project/current-project :eaf])]
-     (assoc-in db
-               [:project/current-project :eaf]
-               (eaf30/edit-annotation eaf ann-id v)))))
+         eaf (get-in db [:project/current-project :eaf])
+         new-db (assoc-in db
+                          [:project/current-project :eaf]
+                          (eaf30/edit-annotation eaf ann-id v))
+         new-doc (:project/current-project new-db)]
+     {:db new-db
+      :pouchdb
+      {:method "put"
+       :args [new-doc
+              (fn [err res]
+                (cond err (throw (js/Error. err))
+                      (not (.-ok res)) (throw (js/Error. res))
+                      :else (>evt [:project/update-project-after-edit new-doc])))]}})))
 
 (rf/reg-event-db
+ :project/update-project-after-edit
+ (fn [db [_ doc]]
+   (update db
+           :ewan.project.core/projects
+           #(map %2 %1)
+           #(if (= (:_id doc) (:_id %))
+              doc
+              %))))
+
+(rf/reg-event-fx
  :project/create-annotation
- (fn [db [_ v]]
+ (fn [{:keys [db]} [_ v]]
    (let [tier-id (:project/tier-for-new-ann db)
          selection-start (:project/selection-start db)
          selection-end (:project/selection-end db)
          current-time (-> db :project/playback :time)
          eaf (-> db :project/current-project :eaf)
-         constraint (eaf30/get-tier-constraint eaf tier-id)]
-     (assoc-in db
-               [:project/current-project :eaf]
-               (eaf30/insert-annotation
-                eaf
-                {:tier-id tier-id
-                 :click-time current-time
-                 :start-time selection-start
-                 :end-time selection-end
-                 :value v})))))
+         new-db (assoc-in db
+                          [:project/current-project :eaf]
+                          (eaf30/insert-annotation
+                           eaf
+                           {:tier-id tier-id
+                            :click-time current-time
+                            :start-time selection-start
+                            :end-time selection-end
+                            :value v}))
+         new-doc (:project/current-project new-db)]
+     {:db new-db
+      :pouchdb
+      {:method "put"
+       :args [new-doc
+              (fn [err res]
+                (cond err (throw (js/Error. err))
+                      (not (.-ok res)) (throw (js/Error. res))
+                      :else (>evt [:project/update-project-after-edit new-doc])))]}})))
 
 (rf/reg-sub
  :project/cv-entries

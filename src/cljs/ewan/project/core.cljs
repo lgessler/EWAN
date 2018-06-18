@@ -192,6 +192,21 @@
                        ;:icon [ic/file-file-upload]
                        :on-click open-upload-project-dialog}]]])
 
+(defn- download-button
+  [{:keys [eaf name]}]
+  [ui/icon-button
+   {:on-click (fn [e]
+                (.stopPropagation e)
+                (let [anchor (js/document.createElement "a")
+                      blob (js/Blob. #js[(eaf30/hiccup->eaf-str eaf)]
+                                     #js{:type "text/plain;charset=utf-8"})]
+                  (.setAttribute anchor "target" "_blank")
+                  (.setAttribute anchor "href" (js/URL.createObjectURL blob))
+                  (.setAttribute anchor "download" (str name ".eaf"))
+                  (.appendChild js/document.body anchor)
+                  (.click anchor)
+                  (.removeChild js/document.body anchor)))}
+   [ic/content-save]])
 
 ;; top level panels
 ;; -----------------------------------------------------------------------------
@@ -202,14 +217,15 @@
      [:h2 "Available projects"]
      [ui/list
       (for [project @projects]
-        [:a.nostyle {:href (str "#/project/" (:_id project))
-                     :key (:_id project)}
+        ^{:key (:_id project)}
          [ui/list-item {:primary-text (:name project)
                         :secondary-text (-> project
                                             :eaf
                                             eaf30/get-date
                                             js/Date.
-                                            .toLocaleDateString)}]])]
+                                            .toLocaleDateString)
+                        :on-click #(set! (.-location js/document) (str "#/project/" (:_id project)))
+                        :right-icon-button (r/as-element [download-button project])}])]
      [new-project-buttons]
      [new-project-dialog]
      [upload-project-dialog]]))
