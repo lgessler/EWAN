@@ -63,7 +63,7 @@
                                            day8.re-frame-10x.preload]
                     :closure-defines      {"re_frame.trace.trace_enabled_QMARK_" true}
                     :external-config      {:devtools/config {:features-to-install :all}}
-                    }}
+                    :recompile-dependents false}}
 
     {:id           "min"
      :source-paths ["src/cljs"]
