@@ -41,6 +41,18 @@
  (fn [db _]
    (merge db default-db)))
 
+(defn- pouchdb-effect-map
+  [new-doc]
+  {:method "put"
+   :args [new-doc
+          (fn [err res]
+            (cond err (throw (js/Error. err))
+                  (not (.-ok res)) (throw (js/Error. res))
+                  (.-rev res) (>evt
+                               [:project/update-project-after-edit
+                                (assoc new-doc :_rev (.-rev res))])
+                  :else (throw (js/Error. "Unknown error while editing/creating annotation"))))]})
+
 (rf/reg-event-fx
  :project/edit-annotation
  (fn [{:keys [db]} [_ v]]
@@ -51,23 +63,7 @@
                           (eaf30/edit-annotation eaf ann-id v))
          new-doc (:project/current-project new-db)]
      {:db new-db
-      :pouchdb
-      {:method "put"
-       :args [new-doc
-              (fn [err res]
-                (cond err (throw (js/Error. err))
-                      (not (.-ok res)) (throw (js/Error. res))
-                      :else (>evt [:project/update-project-after-edit new-doc])))]}})))
-
-(rf/reg-event-db
- :project/update-project-after-edit
- (fn [db [_ doc]]
-   (update db
-           :ewan.project.core/projects
-           #(map %2 %1)
-           #(if (= (:_id doc) (:_id %))
-              doc
-              %))))
+      :pouchdb (pouchdb-effect-map new-doc)})))
 
 (rf/reg-event-fx
  :project/create-annotation
@@ -88,13 +84,20 @@
                             :value v}))
          new-doc (:project/current-project new-db)]
      {:db new-db
-      :pouchdb
-      {:method "put"
-       :args [new-doc
-              (fn [err res]
-                (cond err (throw (js/Error. err))
-                      (not (.-ok res)) (throw (js/Error. res))
-                      :else (>evt [:project/update-project-after-edit new-doc])))]}})))
+      :pouchdb (pouchdb-effect-map new-doc)})))
+
+(rf/reg-event-db
+ :project/update-project-after-edit
+ (fn [db [_ doc]]
+   (js/console.log "Searching " (count (:ewan.project.core/projects db)) " docs...")
+   (-> db
+       (assoc :project/current-project doc)
+       (assoc :ewan.project.core/projects
+              (map (fn [old]
+                     (if (= (:_id doc) (:_id old))
+                       doc
+                       old))
+                   (:ewan.project.core/projects db))))))
 
 (rf/reg-sub
  :project/cv-entries
