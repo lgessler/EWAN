@@ -186,6 +186,12 @@
  (fn [selected-id [_ tier-id]]
    (= selected-id tier-id)))
 
+(rf/reg-sub
+ :project/tier-has-constraint
+ :<- [:project/current-eaf]
+ (fn [eaf [_ tier-id]]
+   (some? (eaf30/get-tier-constraint eaf tier-id))))
+
 ;; crosshair and selection subs
 ;; ----------------------------------------------------------------------------
 (rf/reg-sub

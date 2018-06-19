@@ -8,7 +8,9 @@
             [ewan.project.edit.state :as state]
             [ewan.project.edit.annotation-edit-dialog :refer [annotation-edit-dialog]]
             [reagent.core :as r]
-            [goog.functions]))
+            [goog.functions]
+            [ewan.eaf30.core :as eaf]
+            [ewan.eaf30.core :as eaf30]))
 
 ;; keep in sync with @tier-label-width in less
 (def ^:private LABEL_WIDTH 100)
@@ -64,7 +66,9 @@
   [:div.tier-row
    [:svg {:width (<sub [:project/tier-width])
           :height (<sub [:project/tier-height])
-          :on-double-click #(>evt [:project/open-ann-edit-dialog {:tier-id tier-id}])}
+          :on-double-click #(if (<sub [:project/tier-has-constraint tier-id])
+                              (js/alert "Sorry, annotation creation on tiers with constraints isn't supported yet.")
+                              (>evt [:project/open-ann-edit-dialog {:tier-id tier-id}]))}
     (doall
      (for [ann annotations]
        ^{:key (-> ann first-child attrs :annotation-id)}
@@ -147,7 +151,10 @@
                     :ripple-color "#00ff84"
                     :icon (r/as-element
                            [ui/font-icon {:class-name "material-icons"}
-                            "add"])}]])
+                            "add"])
+                    :on-click #(js/alert (str "Sorry, adding tiers isn't currently supported."
+                                              " Please make your tiers in an ELAN file and "
+                                              "upload your project again."))}]])
 
 (defn- tier-labels [tiers]
   [:div.tier-labels
