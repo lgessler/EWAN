@@ -12,7 +12,7 @@ This will be an experimental port of a minimal feature-subset of [ELAN](https://
 
 ☑️ Offline operation
 
-☐ Export to ELAN files
+☑️ Export to ELAN files
 
 ☐ Support for most basic ELAN workflows
 
