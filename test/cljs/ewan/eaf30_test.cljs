@@ -1,6 +1,6 @@
 (ns ewan.eaf30-test
   (:require [cljs.test :refer-macros [deftest testing is]]
-            [ewan.eaf30 :as eaf]))
+            [ewan.eaf30.core :as eaf]))
 
 (deftest example-0
   (testing "a small EAF file that should parse"
