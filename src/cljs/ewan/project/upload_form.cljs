@@ -18,6 +18,7 @@
   {:name ""
    :name-err ""
    :file nil
+   :file-err ""
    :eaf nil
    :files []
    :files-err ""})
@@ -27,6 +28,12 @@
   (if (> (count name) 0)
     ""
     "Project must have a name."))
+
+(defn- file-error-text
+  [eaf]
+  (if (not= (eaf30/get-version eaf) "3.0")
+    "The ELAN file must have been created using ELAN 5.0 or later. Please open this file with ELAN 5.0 or later, save it, and try again."
+    nil))
 
 (defn- files-error-text
   [files]
@@ -112,6 +119,9 @@
                                 (let [hiccup (eaf30/eaf-str->hiccup
                                               (-> e .-target .-result))]
                                   (swap! state assoc :eaf hiccup)
+                                  (when (file-error-text (:eaf @state))
+                                    (js/alert (file-error-text (:eaf @state)))
+                                    (rf/dispatch [:ewan.project.core/close-upload-project-dialog]))
                                   (swap! state update :files into
                                          (map media-descriptor->filename (eaf30/get-media-descriptors hiccup))))))
                         (.readAsText reader file)
@@ -127,10 +137,11 @@
             :label-position "after"
             :icon (ic/file-file-upload)
             :disable-touch-ripple true
-            :on-click #(-> (.getElementById
-                            js/document
-                            "upload-project-dialog-form-file-field")
-                           (.click))}]])
+            :on-click (fn []
+                        (-> (.getElementById
+                             js/document
+                             "upload-project-dialog-form-file-field")
+                            (.click)))}]])
 
        [:label {:for "upload-project-dialog-form-name-field"} "Project name"]
        [ui/text-field
