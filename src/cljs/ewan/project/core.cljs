@@ -195,7 +195,10 @@
 (defn- download-button
   [{:keys [eaf name]}]
   [ui/icon-button
-   {:on-click (fn [e]
+   {:tooltip "Download EAF file"
+    :tooltip-position "top-center"
+    :touch true
+    :on-click (fn [e]
                 (.stopPropagation e)
                 (let [anchor (js/document.createElement "a")
                       blob (js/Blob. #js[(eaf30/hiccup->eaf-str eaf)]
@@ -205,7 +208,12 @@
                   (.setAttribute anchor "download" (str name ".eaf"))
                   (.appendChild js/document.body anchor)
                   (.click anchor)
-                  (.removeChild js/document.body anchor)))}
+                  (.removeChild js/document.body anchor)))
+    ;; :right-icon-button doesn't set position properly, so we need to hack it
+    :style {:position "absolute"
+            :left "80%"
+            :top "14px"}
+    :tooltip-styles {:top "4px"}}
    [ic/content-save]])
 
 ;; top level panels
