@@ -43,9 +43,10 @@
                (js/console.log "error: " err))))
     (.allDocs db
               (fn [err res]
+                (js/console.log "total rows: " (.-total_rows res))
                 (when err (throw (js/Error. err)))
                 (when (= (.-total_rows res) 0)
-                  (.post db default-project))))
+                  )))
     db))
 
 ;; ------------------------------------------------------------
@@ -76,26 +77,28 @@
 (rf/reg-event-fx
  ::initialize-db
  (fn [{:keys [db]} _]
-   {:db
-    (merge default-db
-           project/default-db)
+   {:db (merge db default-db project/default-db)
     :pouchdb
     {:method "allDocs"
      :args [{:include_docs true}
             (fn [error result]
-              (if error
-                (throw error)
+              (when error
+                (throw error))
+              (if (= (-> result .-rows .-length) 0)
+                (.post current-db
+                       default-project
+                       (fn [err res]
+                         (when (or err (not (.-ok res)))
+                           (throw (js/Error. err)))
+                         (rf/dispatch [::initialize-db])))
                 (rf/dispatch [::pdb-docs-loaded result])))]}}))
 
 (rf/reg-event-db
  ::pdb-docs-loaded
  (fn [db [_ docs]]
    ;; ignore errors and row count, for now
-   (js/console.log docs)
    (let [rows (:rows (js->clj docs :keywordize-keys true))
          docs (map #(:doc %) rows)]
-     (js/console.log rows)
-     (js/console.log (doall docs))
      (update db ::project/projects into docs))))
 
 (rf/reg-event-fx
