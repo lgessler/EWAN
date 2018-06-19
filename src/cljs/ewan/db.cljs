@@ -9,7 +9,38 @@
 
 ;; TODO: allow the selection of a database. For now, just use
 ;; a single DB
-(def current-db (js/PouchDB. "default-db"))
+(def current-db
+  (let [db (js/PouchDB. "ewan-db")]
+    ;; to make this work, would need to duplicate the current
+    ;; doc into a database of its own where each node is a
+    ;; document.
+    #_
+    (.. js/PouchDB
+        (sync "ewan-db"
+              "http://192.168.1.13:5984/ewan-db"
+              #js{:live true
+                  :retry true
+                  :auth #js{:username "admin"
+                            :password "admin"}})
+        (on "change"
+             (fn [info]
+               (js/console.log "change: " info)))
+        (on "paused"
+            (fn [err]
+              (js/console.log "paused: " err)))
+        (on "active"
+            (fn []
+              (js/console.log "reactivated")))
+        (on "denied"
+            (fn [err]
+              (js/console.log "denied: " err)))
+        (on "complete"
+            (fn [info]
+              (js/console.log "complete: " info)))
+        (on "error"
+             (fn [err]
+               (js/console.log "error: " err))))
+    db))
 
 ;; ------------------------------------------------------------
 ;; pdb effects
