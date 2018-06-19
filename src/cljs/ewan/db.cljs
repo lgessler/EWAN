@@ -1,6 +1,7 @@
 (ns ewan.db
   (:require [re-frame.core :as rf]
             [ewan.project.core :as project]
+            [ewan.fixtures :refer [default-project]]
             [cljsjs.pouchdb]))
 
 ;; ------------------------------------------------------------
@@ -40,6 +41,11 @@
         (on "error"
              (fn [err]
                (js/console.log "error: " err))))
+    (.allDocs db
+              (fn [err res]
+                (when err (throw (js/Error. err)))
+                (when (= (.-total_rows res) 0)
+                  (.post db default-project))))
     db))
 
 ;; ------------------------------------------------------------
