@@ -160,29 +160,30 @@
         [ui/table-body
          {:display-row-checkbox false
           :show-row-hover true}
-         (for [file (:files @state)]
-           [ui/table-row {:key (if (string? file)
-                                 file
-                                 (-> file unique-file-map vals str))
-                          :style (if (or (string? file)
-                                         (not (file-required? (.-name file) state)))
-                                   {:cursor "pointer"}
-                                   {})}
-            [ui/table-row-column
-             [ui/icon-button
-              {:style {:vertical-align "middle"}}
-              (cond (string? file) [ic/file-file-upload {:color "red"}]
-                    (not (file-required? (.-name file) state)) [ic/navigation-close]
-                    :else [ui/font-icon {:class-name "material-icons"} "done"])]
+         (doall
+          (for [file (:files @state)]
+            [ui/table-row {:key (if (string? file)
+                                  file
+                                  (-> file unique-file-map vals str))
+                           :style (if (or (string? file)
+                                          (not (file-required? (.-name file) state)))
+                                    {:cursor "pointer"}
+                                    {})}
+             [ui/table-row-column
+              [ui/icon-button
+               {:style {:vertical-align "middle"}}
+               (cond (string? file) [ic/file-file-upload {:color "red"}]
+                     (not (file-required? (.-name file) state)) [ic/navigation-close]
+                     :else [ui/font-icon {:class-name "material-icons"} "done"])]
 
-             [:div {:style {:display "inline-block"
-                            :vertical-align "middle"}}
-              (or (.-name file) file)]]
+              [:div {:style {:display "inline-block"
+                             :vertical-align "middle"}}
+               (or (.-name file) file)]]
 
-            [ui/table-row-column
-             (if (string? file)
-               ""
-               (fmt-size (.-size file)))]])]]
+             [ui/table-row-column
+              (if (string? file)
+                ""
+                (fmt-size (.-size file)))]]))]]
        [:div.upload-project-dialog-form__file-error-text (:files-err @state)]
 
        [ui/flat-button {:label "Add files"

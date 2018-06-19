@@ -110,21 +110,22 @@
         [ui/table-body
          {:display-row-checkbox false
           :show-row-hover true}
-         (for [file (:files @state)]
-           [ui/table-row {:key (-> file unique-file-map vals str)}
-            [ui/table-row-column
-             [:svg {:view-box "0 0 20 20"
-                    :width "20"
-                    :height "20"
-                    :style {:display "inline-block"
-                            :vertical-align "middle"
-                            :margin-right "12px"
-                            :cursor "pointer"}}
-              [ic/navigation-close]]
-             [:div {:style {:display "inline-block"
-                            :vertical-align "middle"}}
-              (.-name file)]]
-            [ui/table-row-column (fmt-size (.-size file))]])]]
+         (doall
+          (for [file (:files @state)]
+            [ui/table-row {:key (-> file unique-file-map vals str)}
+             [ui/table-row-column
+              [:svg {:view-box "0 0 20 20"
+                     :width "20"
+                     :height "20"
+                     :style {:display "inline-block"
+                             :vertical-align "middle"
+                             :margin-right "12px"
+                             :cursor "pointer"}}
+               [ic/navigation-close]]
+              [:div {:style {:display "inline-block"
+                             :vertical-align "middle"}}
+               (.-name file)]]
+             [ui/table-row-column (fmt-size (.-size file))]]))]]
        [ui/raised-button {:label "Add files"
                           :primary true
                           :on-click
