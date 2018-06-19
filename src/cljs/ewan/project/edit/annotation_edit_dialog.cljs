@@ -1,6 +1,6 @@
 (ns ewan.project.edit.annotation-edit-dialog
   (:require [re-frame.core :as rf]
-            [ewan.eaf30 :as eaf30]
+            [ewan.eaf30.core :as eaf30]
             [ewan.common :refer [>evt <sub simple-sub]]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core]

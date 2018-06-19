@@ -1,6 +1,6 @@
 (ns ewan.project.upload-form
   (:require [re-frame.core :as rf]
-            [ewan.eaf30 :as eaf30]
+            [ewan.eaf30.core :as eaf30]
             [cljsjs.material-ui]
             [cljs-react-material-ui.core]
             [cljs-react-material-ui.reagent :as ui]

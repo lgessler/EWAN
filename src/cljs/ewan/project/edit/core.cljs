@@ -1,7 +1,7 @@
 (ns ewan.project.edit.core
   (:require [re-frame.core :as rf]
             [ewan.common :refer [<sub >evt]]
-            [ewan.eaf30 :as eaf30]
+            [ewan.eaf30.core :as eaf30]
             [ewan.project.edit.tiers :as tiers]
             [ewan.project.edit.state :as state]
             [cljsjs.material-ui]

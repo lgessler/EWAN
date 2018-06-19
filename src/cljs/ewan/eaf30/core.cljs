@@ -1,4 +1,4 @@
-(ns ewan.eaf30
+(ns ewan.eaf30.core
   (:require [cljs.spec.alpha :as s]
             [clojure.data.xml :as xml]
             [clojure.string :as string]

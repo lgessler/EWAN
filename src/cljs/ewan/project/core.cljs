@@ -1,6 +1,6 @@
 (ns ewan.project.core
   (:require [re-frame.core :as rf]
-            [ewan.eaf30 :as eaf30]
+            [ewan.eaf30.core :as eaf30]
             [ewan.project.new-form :refer [new-project-dialog-form]]
             [ewan.project.upload-form :refer [upload-project-dialog-form]]
             [ewan.project.edit.core :refer [project-edit-panel-body]]
