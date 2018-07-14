@@ -1,6 +1,10 @@
 # ewan
 
-This will be an experimental port of a minimal feature-subset of [ELAN](https://tla.mpi.nl/tools/tla-tools/elan/) into the browser. I am using a variety of tools I'm excited about, including [ClojureScript](https://clojurescript.org/),  [re-frame](https://github.com/Day8/re-frame), [PouchDB](https://pouchdb.com/), and [Material-UI](http://www.material-ui.com/).
+This is an experimental port of a minimal feature-subset of [ELAN](https://tla.mpi.nl/tools/tla-tools/elan/) into the browser. I used a variety of tools I'm excited about, including [ClojureScript](https://clojurescript.org/),  [re-frame](https://github.com/Day8/re-frame), [PouchDB](https://pouchdb.com/), and [Material-UI](http://www.material-ui.com/).
+
+**You can try the demo [here](https://lgessler.com/ewan/).**
+
+I have stopped working on this project and don't expect it to ever be finished.
 
 # Roadmap
 
